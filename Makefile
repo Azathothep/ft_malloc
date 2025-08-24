@@ -5,6 +5,10 @@ endif
 #-------------- SOURCES --------------#
 
 SRC =		malloc.c \
+		free.c \
+		realloc.c \
+		utils.c \
+		lst_free.c
 
 SRC_DIR =	src
 
@@ -22,7 +26,9 @@ CC =		gcc
 
 FLAGS =		-Wall -Wextra -Werror -g
 
-INCLUDES =	malloc.h \
+INCLUDES =	${SRC_DIR}/malloc.h \
+		${SRC_DIR}/utils.h \
+		${SRC_DIR}/lst_free.h \
 		${LIBFT_INCLUDE}
 
 LIBFT_NAME =	libft.a
@@ -35,19 +41,19 @@ LIBFT =		${LIBFT_DIR}/${LIBFT_NAME}
 
 #--------------- RULES --------------#
 
-all:		${NAME}
+all:		makelibft ${NAME}
 
 ${OBJ_DIR}/%.o:	${SRC_DIR}/%.c ${INCLUDES} | ${OBJ_DIR}
 		${CC} ${FLAGS} -fPIC -c $< -o $@ -I. -I${LIBFT_DIR}
 
 ${NAME}:	${LIBFT} ${OBJ} ${INCLUDES}
-		${CC} ${FLAGS} ${OBJ} -shared -o ${LIBHOST}
+		${CC} ${FLAGS} ${OBJ} -L${LIBFT_DIR} -lft -shared -o ${LIBHOST}
 		ln -sf ${LIBHOST} ${NAME}
 
 ${OBJ_DIR}:	
 		@mkdir -p ${OBJ_DIR}
 
-${LIBFT}:	
+makelibft:	
 		${MAKE} -C ${LIBFT_DIR}
 
 clean:		

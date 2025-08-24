@@ -22,7 +22,7 @@ CC =		gcc
 
 FLAGS =		-Wall -Wextra -Werror -g
 
-INCLUDES =	${MALLOC_DIR}/malloc.h
+INCLUDES =	${MALLOC_DIR}/ft_malloc.h
 
 #--------------- RULES --------------#
 
