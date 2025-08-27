@@ -8,7 +8,8 @@ SRC =		malloc.c \
 		free.c \
 		realloc.c \
 		utils.c \
-		lst_free.c
+		lst_free.c \
+		show_free_mem.c \
 
 SRC_DIR =	src
 

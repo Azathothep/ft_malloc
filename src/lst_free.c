@@ -12,13 +12,14 @@ void	*lst_free_get_slot(void *blockAddr) {
 }
 
 t_free	*lst_free_new(int size, void *addr) {
-	t_memzone *MemZone = &globalmemdatas.LstZone;
+	t_memchunks *MemZone = &MemoryLayout.InternZone;
 			
 	if (MemZone->StartingBlockAddr == NULL) {
 		//PRINT("Allocating page for free lists\n");
-		void *ptr = map_memory(MemZone->AllocSize);
+		void *ptr = map_memory(INTERN_CHUNK);
 		if (ptr == NULL)
 			return NULL;
+
 		MemZone->StartingBlockAddr = ptr;
 	}
 
