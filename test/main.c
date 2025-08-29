@@ -13,12 +13,14 @@ int main(int argc, char** argv)
 	void *a[150];
 	int i = 0;
 	while (i < 150){
-		//size_t size = (i % 5 * 70) + 1;
-    a[i] = malloc(24);
-    i++;
+		size_t size = (i % 5 * 70) + 1;
+    		a[i] = malloc(size);
+    		i++;
 	}
 
-  	i = 0;
+	show_free_mem();
+  	
+	i = 0;
 	while (i < 150) {
     		free(a[i]);
     		i++;

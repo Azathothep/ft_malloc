@@ -78,17 +78,18 @@ void	*malloc_block(size_t size) {
 	} else {
 		MemZone = &MemoryLayout.TinyZone;
 		MinSlotSize = TINY_SPACE_MIN;
+		RequestedSize = TINY_SPACE_MIN;
 	}
 
 	t_free *Slot = get_free_slot(&MemZone->FreeList, RequestedSize);
 	if (Slot == NULL) {
 		// allocated new
 		int ChunkSize = 0;
-	   	if (size > SMALL_ALLOC)
+	   	if (size > SMALL_ALLOC) {
 			ChunkSize = LARGE_CHUNK(size);
-		else if (size > TINY_ALLOC)
+		} else if (size > TINY_ALLOC) {
 			ChunkSize = SMALL_CHUNK;
-    		else {
+    		} else {
 			ChunkSize = TINY_CHUNK;
     		}
 
@@ -96,18 +97,18 @@ void	*malloc_block(size_t size) {
 		if (NewChunk == NULL)
 			return NULL;
 
-    void *ChunkStartingAddr = CHUNK_STARTING_ADDR(NewChunk);
+    		void *ChunkStartingAddr = CHUNK_STARTING_ADDR(NewChunk);
 		void *FirstAddr = ChunkStartingAddr + HEADER_SIZE;
-    Slot = lst_free_add(&MemZone->FreeList,
+    		Slot = lst_free_add(&MemZone->FreeList,
 					CHUNK_USABLE_SIZE(ChunkSize),
 					FirstAddr);
 	}
 
 	void *Addr = get_free_addr(Slot);
-  int AllocatedSize = RequestedSize;
+	int AllocatedSize = RequestedSize;
 	if (Slot->Size >= (RequestedSize + MinSlotSize)) { // if there is enough space to make another slot
 		Slot->Size -= RequestedSize;
-    Addr += Slot->Size;
+		Addr += Slot->Size;
 	} else {
 		AllocatedSize = Slot->Size;
 		lst_free_remove(&MemZone->FreeList, Slot);
@@ -120,6 +121,7 @@ void	*malloc_block(size_t size) {
 		hdr->Prev = NULL; // TODO(felix): replace NULL with real previous slot
 
 	hdr->Next = Addr + AllocatedSize;
+	hdr->Size = AllocatedSize;
 
 	PRINT("Allocated "); PRINT_UINT64(AlignedSize); PRINT(" bytes at address "); PRINT_ADDR(GET_SLOT(Addr)); NL();
 

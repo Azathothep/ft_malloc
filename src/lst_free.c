@@ -6,8 +6,7 @@ void	*get_free_addr(t_free *Slot) {
 }
 
 void	*lst_free_add(t_free **BeginList, int Size, void *Addr) {
-//	it_free *slot = lst_free_new(size, addr);
-
+	
 	t_free *Slot = (t_free *)Addr;
 	Slot->Size = Size;
 	Slot->Prev = NULL;

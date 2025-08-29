@@ -56,7 +56,7 @@ void	free(void *Ptr) {
 		&& Slot->Size == CHUNK_USABLE_SIZE(GET_CHUNK_SIZE(CurrentChunk))) {
 			lst_free_remove(&MemBlock->FreeList, Slot);
 
-      PRINT("Unmapping chunk at address "); PRINT_ADDR(CurrentChunk); PRINT(" and size "); PRINT_UINT64(GET_CHUNK_SIZE(CurrentChunk)); NL();
+ 			PRINT("Unmapping chunk at address "); PRINT_ADDR(CurrentChunk); PRINT(" and size "); PRINT_UINT64(GET_CHUNK_SIZE(CurrentChunk)); NL();
       
       			void *NextChunk = GET_NEXT_CHUNK(CurrentChunk);
       			if (munmap(CurrentChunk, GET_CHUNK_SIZE(CurrentChunk)) < 0)

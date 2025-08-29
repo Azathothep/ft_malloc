@@ -57,15 +57,15 @@ extern	t_memlayout MemoryLayout;
 # define ALIGNMENT		8
 # define SIZE_ALIGN(s)		(((s) + (ALIGNMENT-1)) & ~(ALIGNMENT-1))
 
-# define TINY_SPACE_MIN		(ALIGNMENT + HEADER_SIZE)
+# define TINY_SPACE_MIN		(sizeof(t_free) + HEADER_SIZE)
 # define SMALL_SPACE_MIN	(SIZE_ALIGN(TINY_ALLOC + 1) + HEADER_SIZE)
 # define LARGE_SPACE_MIN	(SIZE_ALIGN(SMALL_ALLOC + 1) + HEADER_SIZE) 
 
 # define GET_HEADER(p)		(t_header *)((void *)p - HEADER_SIZE)	
 # define GET_SLOT(p)		(void *)(p + HEADER_SIZE)
 
-# define SLOT_USABLE_SIZE(p) 	(void *)((GET_HEADER(p))->Next) - p
-# define SLOT_FULL_SIZE(p)  	(void *)((GET_HEADER(p))->Next) - (void *)GET_HEADER(p)
+# define SLOT_USABLE_SIZE(p) 	((GET_HEADER(p))->Size) - HEADER_SIZE //(void *)((GET_HEADER(p))->Next) - p
+# define SLOT_FULL_SIZE(p)  	((GET_HEADER(p))->Size) //(void *)((GET_HEADER(p))->Next) - (void *)GET_HEADER(p)
 
 void	*map_memory(int size);
 
