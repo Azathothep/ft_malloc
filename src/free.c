@@ -20,12 +20,9 @@ size_t	coalesce_with_prev(t_header *MiddleHdr) {
 void	free(void *Ptr) {
 	//PRINT("Freeing address "); PRINT_ADDR(Ptr); NL();
 
-	//TODO(felix): verify if block need to be freed beforehand
-	
-	//t_header *Header = GET_HEADER(Ptr);
+	//TODO(felix): verify if block need to be freed beforehand	
 
  	size_t BlockSize = SLOT_USABLE_SIZE(Ptr);
-	//PRINT("Slot size is "); PRINT_UINT64(BlockWithOverheadSize); NL();
 	
 	t_memchunks *MemBlock = NULL;
 	if (BlockSize > SMALL_ALLOC) {

@@ -18,6 +18,8 @@ int main(int argc, char** argv)
     		i++;
 	}
 
+	show_alloc_mem();
+
 	show_free_mem();
   	
 	i = 0;
