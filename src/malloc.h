@@ -10,7 +10,7 @@ typedef struct 	s_header {
 }		t_header;
 
 typedef struct	s_free {
-	size_t	Size;
+	//size_t	Size;
 	struct s_free	*Prev;
 	struct s_free	*Next;
 }		t_free;
@@ -61,11 +61,14 @@ extern	t_memlayout MemoryLayout;
 # define SMALL_SPACE_MIN	(SIZE_ALIGN(TINY_ALLOC + 1) + HEADER_SIZE)
 # define LARGE_SPACE_MIN	(SIZE_ALIGN(SMALL_ALLOC + 1) + HEADER_SIZE) 
 
-# define GET_HEADER(p)		(t_header *)((void *)p - HEADER_SIZE)	
-# define GET_SLOT(p)		(void *)(p + HEADER_SIZE)
+# define GET_HEADER(p)		((t_header *)((void *)p - HEADER_SIZE))	
+# define GET_SLOT(p)		((void *)(p + HEADER_SIZE))
 
-# define SLOT_USABLE_SIZE(p) 	((GET_HEADER(p))->Size) - HEADER_SIZE //(void *)((GET_HEADER(p))->Next) - p
-# define SLOT_FULL_SIZE(p)  	((GET_HEADER(p))->Size) //(void *)((GET_HEADER(p))->Next) - (void *)GET_HEADER(p)
+# define SLOT_USABLE_SIZE(p) 	(((GET_HEADER(p))->Size) - HEADER_SIZE)
+# define SLOT_FULL_SIZE(p)  	((GET_HEADER(p))->Size) 
+
+# define GET_FREE_SIZE(p)	(GET_HEADER(p)->Size)
+# define SET_FREE_SIZE(p, s)	GET_HEADER(p)->Size = s
 
 void	*map_memory(int size);
 

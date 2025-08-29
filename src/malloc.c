@@ -32,8 +32,8 @@ t_free	*get_free_slot(t_free **begin_lst, size_t size) {
 	if (lst == NULL)
 		return NULL;
 
-	while (lst != NULL && lst->Size < size) {
-        lst = lst->Next;
+	while (lst != NULL && GET_FREE_SIZE(lst) < size) {
+        	lst = lst->Next;
 	}
 
 	return lst;
@@ -106,11 +106,12 @@ void	*malloc_block(size_t size) {
 
 	void *Addr = get_free_addr(Slot);
 	int AllocatedSize = RequestedSize;
-	if (Slot->Size >= (RequestedSize + MinSlotSize)) { // if there is enough space to make another slot
-		Slot->Size -= RequestedSize;
-		Addr += Slot->Size;
+	if (GET_FREE_SIZE(Slot) >= (RequestedSize + MinSlotSize)) { // if there is enough space to make another slot
+		size_t NewSize = GET_FREE_SIZE(Slot) - RequestedSize;
+		SET_FREE_SIZE(Slot, NewSize);
+		Addr += NewSize;
 	} else {
-		AllocatedSize = Slot->Size;
+		AllocatedSize = GET_FREE_SIZE(Slot);
 		lst_free_remove(&MemZone->FreeList, Slot);
 	}
 	

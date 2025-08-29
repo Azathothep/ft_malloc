@@ -30,9 +30,10 @@ void	free(void *Ptr) {
 
 	//Coalesce
 	if (Prev != NULL
-	&& get_free_addr(Prev) + Prev->Size == get_free_addr(Slot)) {
-		PRINT("Coalescing with previous slot for total size "); PRINT_UINT64(Prev->Size + Slot->Size); NL();
-		Prev->Size += Slot->Size;
+	&& get_free_addr(Prev) + GET_FREE_SIZE(Prev) == get_free_addr(Slot)) {
+		size_t NewSize = GET_FREE_SIZE(Prev) + GET_FREE_SIZE(Slot);
+		PRINT("Coalescing with previous slot for total size "); PRINT_UINT64(NewSize); NL();
+		SET_FREE_SIZE(Prev, NewSize);
 		lst_free_remove(&MemBlock->FreeList, Slot);
 		Slot = Prev;
 	}
@@ -40,9 +41,10 @@ void	free(void *Ptr) {
 	t_free *Next = Slot->Next;
 	
 	if (Next != NULL
-	&& get_free_addr(Slot) + Slot->Size == get_free_addr(Next)) {
-		PRINT("Coalescing with following slot for total size "); PRINT_UINT64(Slot->Size + Slot->Next->Size); NL();
-		Slot->Size = Slot->Size + Slot->Next->Size;
+	&& get_free_addr(Slot) + GET_FREE_SIZE(Slot) == get_free_addr(Next)) {
+		size_t NewSize = GET_FREE_SIZE(Slot) + GET_FREE_SIZE(Slot->Next);
+		PRINT("Coalescing with following slot for total size "); PRINT_UINT64(NewSize); NL();
+		SET_FREE_SIZE(Slot, NewSize);
 		lst_free_remove(&MemBlock->FreeList, Slot->Next);
 	}
 
@@ -53,7 +55,7 @@ void	free(void *Ptr) {
 	while (CurrentChunk != NULL)
 	{
 		if (get_free_addr(Slot) == CurrentChunkStartingAddr
-		&& Slot->Size == CHUNK_USABLE_SIZE(GET_CHUNK_SIZE(CurrentChunk))) {
+		&& GET_FREE_SIZE(Slot) == CHUNK_USABLE_SIZE(GET_CHUNK_SIZE(CurrentChunk))) {
 			lst_free_remove(&MemBlock->FreeList, Slot);
 
  			PRINT("Unmapping chunk at address "); PRINT_ADDR(CurrentChunk); PRINT(" and size "); PRINT_UINT64(GET_CHUNK_SIZE(CurrentChunk)); NL();
