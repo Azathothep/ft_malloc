@@ -12,7 +12,6 @@ void	free(void *Ptr) {
 	//t_header *Header = GET_HEADER(Ptr);
 
  	size_t BlockSize = SLOT_USABLE_SIZE(Ptr);
-	size_t BlockWithOverheadSize = SLOT_FULL_SIZE(Ptr);
 	//PRINT("Slot size is "); PRINT_UINT64(BlockWithOverheadSize); NL();
 	
 	t_memchunks *MemBlock = NULL;
@@ -24,7 +23,7 @@ void	free(void *Ptr) {
   		MemBlock = &MemoryLayout.TinyZone;
 	}
 
-	t_free *Slot = lst_free_add(&MemBlock->FreeList, BlockWithOverheadSize, (void *)Ptr);
+	t_free *Slot = lst_free_add(&MemBlock->FreeList, (void *)Ptr);
 
 	t_free *Prev = Slot->Prev;
 

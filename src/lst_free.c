@@ -5,10 +5,9 @@ void	*get_free_addr(t_free *Slot) {
 	return (void *)GET_HEADER(Slot);
 }
 
-void	*lst_free_add(t_free **BeginList, size_t Size, void *Addr) {
+void	*lst_free_add(t_free **BeginList, void *Addr) {
 	
 	t_free *Slot = (t_free *)Addr;
-	SET_FREE_SIZE(Slot, Size);
 	Slot->Prev = NULL;
 	Slot->Next = NULL;
 

@@ -98,33 +98,31 @@ void	*malloc_block(size_t size) {
 			return NULL;
 
     		void *ChunkStartingAddr = CHUNK_STARTING_ADDR(NewChunk);
-		void *FirstAddr = ChunkStartingAddr + HEADER_SIZE;
-    		Slot = lst_free_add(&MemZone->FreeList,
-					CHUNK_USABLE_SIZE(ChunkSize),
-					FirstAddr);
+		
+		t_header *Hdr = (t_header *)ChunkStartingAddr;
+		Hdr->Prev = NULL;
+		Hdr->Next = NULL;
+		Hdr->Size = CHUNK_USABLE_SIZE(ChunkSize);
+
+		void *FirstAddr = ChunkStartingAddr + HEADER_SIZE;  
+
+  		Slot = lst_free_add(&MemZone->FreeList, FirstAddr);
 	}
 
-	void *Addr = get_free_addr(Slot);
-	int AllocatedSize = RequestedSize;
+	void *Addr = get_free_addr(Slot);	
 	if (GET_FREE_SIZE(Slot) >= (RequestedSize + MinSlotSize)) { // if there is enough space to make another slot
 		size_t NewSize = GET_FREE_SIZE(Slot) - RequestedSize;
 		SET_FREE_SIZE(Slot, NewSize);
 		Addr += NewSize;
+		t_header *Hdr = (t_header *)Addr;
+		Hdr->Size = RequestedSize;
 	} else {
-		AllocatedSize = GET_FREE_SIZE(Slot);
+		t_header *Hdr = (t_header *)Addr;
+		Hdr->Size = GET_FREE_SIZE(Slot);
 		lst_free_remove(&MemZone->FreeList, Slot);
 	}
 	
-	t_header *hdr = (t_header *)Addr;
-	if (get_free_addr(Slot) != Addr)
-		hdr->Prev = get_free_addr(Slot);
-	else
-		hdr->Prev = NULL; // TODO(felix): replace NULL with real previous slot
-
-	hdr->Next = Addr + AllocatedSize;
-	hdr->Size = AllocatedSize;
-
-	PRINT("Allocated "); PRINT_UINT64(AlignedSize); PRINT(" bytes at address "); PRINT_ADDR(GET_SLOT(Addr)); NL();
+	PRINT("Allocated "); PRINT_UINT64(AlignedSize); PRINT(" ["); PRINT_UINT64(RequestedSize); PRINT("] bytes at address "); PRINT_ADDR(GET_SLOT(Addr)); NL();
 
 	return GET_SLOT(Addr);
 }
