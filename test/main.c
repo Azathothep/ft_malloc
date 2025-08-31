@@ -4,15 +4,18 @@
 #include <string.h>
 #include <unistd.h>
 
+# define INDEX	16
+
 int main(int argc, char** argv)
 {
 	(void)argc;
 	(void)argv;
 
 	show_free_mem();
-	void *a[150];
+
+	void *a[INDEX];
 	int i = 0;
-	while (i < 150){
+	while (i < INDEX){
 		size_t size = (i % 5 * 70) + 1;
     		a[i] = malloc(size);
     		i++;
@@ -23,10 +26,17 @@ int main(int argc, char** argv)
 	show_free_mem();
   	
 	i = 0;
-	while (i < 150) {
+	while (i < INDEX/ 2) {
     		free(a[i]);
     		i++;
   	}
+
+	show_alloc_mem();
+
+	while (i < INDEX) {
+		free(a[i]);
+		i++;
+	}
 
 	void *p = malloc(5000);
 	free(p);

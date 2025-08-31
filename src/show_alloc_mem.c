@@ -2,6 +2,10 @@
 #include "lst_free.h"
 #include "utils.h"
 
+#define ANSI_COLOR_RED		"\x1b[31m"
+#define	ANSI_COLOR_GREEN	"\x1b[32m"
+#define ANSI_COLOR_RESET	"\x1b[0m"
+
 //TODO(felix): add chunk subdivision in zones
 
 void	show_alloc_zone(t_memchunks *Zone) {
@@ -11,8 +15,14 @@ void	show_alloc_zone(t_memchunks *Zone) {
 		void *StartingAddr = CHUNK_STARTING_ADDR(Chunk);	
 		t_header *Hdr = (t_header *)StartingAddr;	
 
-		while (Hdr->Next) {
-			PRINT_ADDR(Hdr); PRINT(": "); PRINT_UINT64(Hdr->Size); PRINT(" bytes\n");
+		while (Hdr != NULL) {
+			char *color = NULL;
+			if (IS_FLAGGED(Hdr) == 1)
+				color = ANSI_COLOR_RED;
+			else
+				color = ANSI_COLOR_GREEN;
+			Hdr = UNFLAG(Hdr);
+			PRINT(color); PRINT_ADDR(Hdr); PRINT(": "); PRINT_UINT64(Hdr->Size); PRINT(" bytes"); PRINT(ANSI_COLOR_RESET); NL();
 			Hdr = Hdr->Next;
 		}
 		

@@ -10,7 +10,6 @@ typedef struct 	s_header {
 }		t_header;
 
 typedef struct	s_free {
-	//size_t	Size;
 	struct s_free	*Prev;
 	struct s_free	*Next;
 }		t_free;
@@ -69,6 +68,11 @@ extern	t_memlayout MemoryLayout;
 
 # define GET_FREE_SIZE(p)	(GET_HEADER(p)->Size)
 # define SET_FREE_SIZE(p, s)	GET_HEADER(p)->Size = s
+
+# define ALLOC_FLAG		1
+# define FLAG(p)		(t_header *)((uint64_t)p | ALLOC_FLAG)
+# define UNFLAG(p)		(t_header *)((uint64_t)p & (~ALLOC_FLAG))
+# define IS_FLAGGED(p)		((uint64_t)p & ALLOC_FLAG)
 
 void	*map_memory(int size);
 

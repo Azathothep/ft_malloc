@@ -5,15 +5,15 @@
 #include "lst_free.h"
 
 size_t	coalesce_with_prev(t_header *MiddleHdr) {
-	t_header *PrevHdr = MiddleHdr->Prev;
-	t_header *NextHdr = MiddleHdr->Next;
+	t_header *PrevHdr = (UNFLAG(MiddleHdr))->Prev;
+	t_header *NextHdr = (UNFLAG(MiddleHdr))->Next;
 
-	PrevHdr->Next = NextHdr;
-	if (NextHdr != NULL)
-		NextHdr->Prev = PrevHdr;
+	(UNFLAG(PrevHdr))->Next = NextHdr;
+	if (UNFLAG(NextHdr) != NULL)
+		(UNFLAG(NextHdr))->Prev = PrevHdr;
 
-	size_t NewSize = PrevHdr->Size + MiddleHdr->Size;
-	PrevHdr->Size = NewSize;
+	size_t NewSize = (UNFLAG(PrevHdr))->Size + (UNFLAG(MiddleHdr))->Size;
+	(UNFLAG(PrevHdr))->Size = NewSize;
 	return NewSize;
 }
 
@@ -37,6 +37,8 @@ void	free(void *Ptr) {
 
 	t_free *Prev = Slot->Prev;
 
+	PRINT("FREEING "); PRINT_ADDR(GET_HEADER(Ptr)); NL();
+
 	//Coalesce
 	if (Prev != NULL
 	&& get_free_addr(Prev) + GET_FREE_SIZE(Prev) == get_free_addr(Slot)) {
@@ -54,6 +56,13 @@ void	free(void *Ptr) {
 		PRINT("Coalescing with following slot for total size "); PRINT_UINT64(NewSize); NL();
 		lst_free_remove(&MemBlock->FreeList, Slot->Next);
 	}
+
+	t_header *Hdr = GET_HEADER(Slot);
+	if (UNFLAG(Hdr->Prev) != NULL)
+		(UNFLAG(Hdr->Prev))->Next = UNFLAG(Hdr);
+
+	if (UNFLAG(Hdr->Next) != NULL)
+		(UNFLAG(Hdr->Next))->Prev = UNFLAG(Hdr);
 
 	//Unmap
   	void *PrevChunk = NULL;

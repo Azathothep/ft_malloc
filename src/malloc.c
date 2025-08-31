@@ -115,23 +115,36 @@ void	*malloc_block(size_t size) {
 		SET_FREE_SIZE(Slot, NewSize);
 		
 		t_header *PrevHdr = (t_header *)Addr;
-		t_header *NextHdr = PrevHdr->Next;		
+		t_header *NextHdr = (UNFLAG(PrevHdr))->Next;		
 
 		Addr += NewSize;
 		t_header *Hdr = (t_header *)Addr;
 		
-		Hdr->Size = RequestedSize;
-		Hdr->Prev = PrevHdr;
-		PrevHdr->Next = Hdr;
+		(UNFLAG(Hdr))->Size = RequestedSize;
+		(UNFLAG(Hdr))->Prev = PrevHdr;
+		(UNFLAG(PrevHdr))->Next = FLAG(Hdr);
+		//PRINT("FLAGGING: "); PRINT_ADDR(Hdr); PRINT(" becomes "); PRINT_ADDR(FLAG(Hdr)); NL();	
+	
+		(UNFLAG(Hdr))->Next = NextHdr;
 		
-		Hdr->Next = NextHdr;
-		
-		if (NextHdr != NULL)
-			NextHdr->Prev = Hdr;
+		if (UNFLAG(NextHdr) != NULL) {
+			(UNFLAG(NextHdr))->Prev = FLAG(Hdr);
+		}
+
+		// flag previous header block's next
+		// flag next header block's previous
 	} else {
 		t_header *Hdr = (t_header *)Addr;
 		Hdr->Size = GET_FREE_SIZE(Slot);
 		lst_free_remove(&MemZone->FreeList, Slot);
+
+		if (Hdr->Prev != NULL) {
+			Hdr->Prev->Next = Hdr; // FLAG(Hdr);
+		}
+
+		if (Hdr->Next != NULL) {
+			Hdr->Next->Prev = Hdr; //FLAG(Hdr);
+		}
 	}
 	
 	PRINT("Allocated "); PRINT_UINT64(AlignedSize); PRINT(" ["); PRINT_UINT64(RequestedSize); PRINT("] bytes at address "); PRINT_ADDR(GET_SLOT(Addr)); NL();
