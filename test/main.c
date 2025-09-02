@@ -32,7 +32,7 @@ int main(int argc, char** argv)
   	}
 
 	show_alloc_mem();
-  show_free_mem();
+	show_free_mem();
   
 	while (i < INDEX) {
 		free(a[i]);

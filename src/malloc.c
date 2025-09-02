@@ -117,14 +117,13 @@ void	*malloc_block(size_t size) {
 		SET_FREE_SIZE(Slot, NewSize);
 		
 		t_header *PrevHdr = Hdr;
-		t_header *NextHdr = Hdr->Next;
 
 		Addr += NewSize;
 		Hdr = (t_header *)Addr;
 		
 		Hdr->Size = RequestedSize;
 		Hdr->Prev = PrevHdr; 
-		Hdr->Next = NextHdr;
+		Hdr->Next = PrevHdr->Next;
 
 		PrevHdr->Next = FLAG(Hdr);
 	} else {
