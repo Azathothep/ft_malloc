@@ -34,9 +34,9 @@ extern	t_memlayout MemoryLayout;
 # define PAGE_SIZE		getpagesize()
 # define CHUNK_ALIGN(c)		(((c) + (PAGE_SIZE-1)) & ~(PAGE_SIZE-1)) 	
 
-# define HEADER_SIZE		  sizeof(t_header)
-# define CHUNK_FOOTER	    sizeof(void *) // pointer to next chunk
-# define CHUNK_HEADER     sizeof(size_t) + sizeof(void *) // size of chunk + pointer to first allocatable block
+# define HEADER_SIZE		sizeof(t_header)
+# define CHUNK_HEADER     	(sizeof(size_t) + sizeof(void *)) // size of chunk + pointer to first allocatable block
+# define CHUNK_FOOTER	    	(sizeof(void *) + sizeof(void *)) // last header pointer + pointer to next chunk
 # define CHUNK_OVERHEAD		(CHUNK_HEADER + CHUNK_FOOTER)
 # define CHUNK_STARTING_ADDR(p) (p + CHUNK_HEADER)
 # define CHUNK_SET_POINTER_TO_FIRST_ALLOC(c, p) (*((void **)c + sizeof(size_t)) = p)
@@ -72,9 +72,12 @@ extern	t_memlayout MemoryLayout;
 # define SET_FREE_SIZE(p, s)	GET_HEADER(p)->Size = s
 
 # define ALLOC_FLAG		1
-# define FLAG(p)		(t_header *)((uint64_t)p | ALLOC_FLAG)
-# define UNFLAG(p)		(t_header *)((uint64_t)p & (~ALLOC_FLAG))
+# define FLAG(p)		((t_header *)((uint64_t)p | ALLOC_FLAG))
+# define UNFLAG(p)		((t_header *)((uint64_t)p & (~ALLOC_FLAG)))
 # define IS_FLAGGED(p)		((uint64_t)p & ALLOC_FLAG)
+
+# define IS_LAST_HDR(Hdr)	(*((void **)Hdr) == NULL)
+# define GET_LAST_HDR(Chunk)	(((void *)Chunk + GET_CHUNK_SIZE(Chunk)) - CHUNK_FOOTER)
 
 void	*map_memory(int size);
 

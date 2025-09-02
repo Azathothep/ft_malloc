@@ -24,15 +24,16 @@ int main(int argc, char** argv)
 	show_alloc_mem();
 
 	show_free_mem();
-  	
+
 	i = 0;
-	while (i < INDEX/ 2) {
+	while (i < INDEX/2) {
     		free(a[i]);
     		i++;
   	}
 
 	show_alloc_mem();
-
+  show_free_mem();
+  
 	while (i < INDEX) {
 		free(a[i]);
 		i++;

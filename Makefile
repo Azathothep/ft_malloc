@@ -31,6 +31,7 @@ FLAGS =		-Wall -Wextra -Werror -g
 INCLUDES =	${SRC_DIR}/malloc.h \
 		${SRC_DIR}/utils.h \
 		${SRC_DIR}/lst_free.h \
+		ft_malloc.h \
 		${LIBFT_INCLUDE}
 
 LIBFT_NAME =	libft.a

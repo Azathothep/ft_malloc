@@ -97,17 +97,17 @@ void	*malloc_block(size_t size) {
 		if (NewChunk == NULL)
 			return NULL;
 
-    void *ChunkStartingAddr = CHUNK_STARTING_ADDR(NewChunk);
-    CHUNK_SET_POINTER_TO_FIRST_ALLOC(NewChunk, ChunkStartingAddr); 
+		void *ChunkStartingAddr = CHUNK_STARTING_ADDR(NewChunk);
+		CHUNK_SET_POINTER_TO_FIRST_ALLOC(NewChunk, ChunkStartingAddr); 
 
 		t_header *Hdr = (t_header *)ChunkStartingAddr;
 		Hdr->Prev = NULL;
-		Hdr->Next = NULL;
+		Hdr->Next = GET_LAST_HDR(NewChunk);
 		Hdr->Size = CHUNK_USABLE_SIZE(ChunkSize);
 
 		void *FirstAddr = ChunkStartingAddr + HEADER_SIZE;  
 
-  	Slot = lst_free_add(&MemZone->FreeList, FirstAddr);
+ 		Slot = lst_free_add(&MemZone->FreeList, FirstAddr);
 	}
 
 	void *Addr = get_free_addr(Slot);	
@@ -124,34 +124,30 @@ void	*malloc_block(size_t size) {
 		(UNFLAG(Hdr))->Size = RequestedSize;
 		(UNFLAG(Hdr))->Prev = PrevHdr;
 		(UNFLAG(PrevHdr))->Next = FLAG(Hdr);
-		//PRINT("FLAGGING: "); PRINT_ADDR(Hdr); PRINT(" becomes "); PRINT_ADDR(FLAG(Hdr)); NL();	
 	
 		(UNFLAG(Hdr))->Next = NextHdr;
 		
-		if (UNFLAG(NextHdr) != NULL) {
+		if (!IS_LAST_HDR(UNFLAG(NextHdr))) {
 			(UNFLAG(NextHdr))->Prev = FLAG(Hdr);
 		}
-
-		// flag previous header block's next
-		// flag next header block's previous
 	} else {
 		t_header *Hdr = (t_header *)Addr;
-		Hdr->Size = RequestedSize; //GET_FREE_SIZE(Slot);
+		Hdr->Size = RequestedSize;
 		lst_free_remove(&MemZone->FreeList, Slot);
 
 		if ((UNFLAG(Hdr->Prev)) != NULL) {
 			(UNFLAG(Hdr->Prev))->Next = FLAG(Hdr);
 		} else {
-        void *ChunkPtr = MemZone->StartingBlockAddr;
-        while (ChunkPtr != NULL && CHUNK_STARTING_ADDR(ChunkPtr) != Hdr) {
-          ChunkPtr = GET_NEXT_CHUNK(ChunkPtr);
-        }
+        	void *ChunkPtr = MemZone->StartingBlockAddr;
+        	while (ChunkPtr != NULL && CHUNK_STARTING_ADDR(ChunkPtr) != Hdr) {
+          	ChunkPtr = GET_NEXT_CHUNK(ChunkPtr);
+        	}
 
-        if (ChunkPtr != NULL)
-          CHUNK_SET_POINTER_TO_FIRST_ALLOC(ChunkPtr, FLAG(Hdr));
-    }
+        	if (ChunkPtr != NULL)
+			CHUNK_SET_POINTER_TO_FIRST_ALLOC(ChunkPtr, FLAG(Hdr));
+    		}
 
-		if ((UNFLAG(Hdr->Next)) != NULL) {
+		if (!IS_LAST_HDR(UNFLAG(Hdr->Next))) {
 			(UNFLAG(Hdr->Next))->Prev = FLAG(Hdr);
 		}
 	}

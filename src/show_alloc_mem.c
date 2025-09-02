@@ -8,20 +8,29 @@
 
 //TODO(felix): add chunk subdivision in zones
 
+void	print_block(t_header *Hdr) {
+	char *color = NULL;
+	if (IS_FLAGGED(Hdr) == 1)
+		color = ANSI_COLOR_RED;
+	else
+		color = ANSI_COLOR_GREEN;
+	Hdr = UNFLAG(Hdr);
+	PRINT(color); PRINT_ADDR(Hdr); PRINT(": "); PRINT_UINT64(Hdr->Size); PRINT(" bytes"); PRINT(ANSI_COLOR_RESET); NL();
+}
+
 void	show_alloc_zone(t_memchunks *Zone) {
 	void *Chunk = Zone->StartingBlockAddr;
 
 	while (Chunk) {
 		t_header *Hdr = CHUNK_GET_POINTER_TO_FIRST_ALLOC(Chunk);	
-
-		while (UNFLAG(Hdr) != NULL) {
-			char *color = NULL;
-			if (IS_FLAGGED(Hdr) == 1)
-				color = ANSI_COLOR_RED;
-			else
-				color = ANSI_COLOR_GREEN;
+		
+		print_block(Hdr);
+		
+		Hdr = UNFLAG(Hdr);
+		Hdr = Hdr->Next;
+		while (!IS_LAST_HDR(UNFLAG(Hdr))) {
+			print_block(Hdr);
 			Hdr = UNFLAG(Hdr);
-			PRINT(color); PRINT_ADDR(Hdr); PRINT(": "); PRINT_UINT64(Hdr->Size); PRINT(" bytes"); PRINT(ANSI_COLOR_RESET); NL();
 			Hdr = Hdr->Next;
 		}
 		
