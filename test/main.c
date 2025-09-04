@@ -1,69 +1,78 @@
 #include <stddef.h>
 #include <stdio.h>
-#include "ft_malloc.h"
+//#include "ft_malloc.h"
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/time.h>
 
-# define INDEX	150
+# define INDEX	300
 
-int main(int argc, char** argv)
-{
-	(void)argc;
-	(void)argv;
-
-	show_free_mem();
-
-	void *a[INDEX];
+void process_allocation(void *a[], int index) {	
 	int i = 0;
-	while (i < INDEX){
-		size_t size =(i % 5 * 70) + 1;
+	while (i < index - 1){
+		size_t size = (i % 5 * 70) + 1;
     		a[i] = malloc(size);
     		i++;
 	}
 
-	show_alloc_mem();
+	a[index - 1] = malloc(5000);
+}
 
-	show_free_mem();
-
-	i = 0;
-	while (i < INDEX / 2) {
-    		free(a[i]);
-    		i++;
-  	}
-
-	show_alloc_mem();
-	show_free_mem();
-  
-	while (i < INDEX) {
+void process_free(void *a[], int index) {
+	int i = 0;
+	while (i < index) {
 		free(a[i]);
 		i++;
 	}
+}
 
-	void *p = malloc(5000);
-	free(p);
+int main(int argc, char** argv)
+{
+	(void)argc;
+	(void)argv;	
 
-  show_alloc_mem();
+	int n = 1;
+	if (argc > 1)
+		n = atoi(argv[1]);
 
-	show_free_mem();
+  //char *buffer = NULL;
+  //read(0, &buffer, 1);
+
+	struct timeval t0, t1;
+	float mallocTotalTime = 0;
+	float freeTotalTime = 0;
+
+	void *a[INDEX];
+
+	int i = 0;
+	while (i < n) {
+		gettimeofday(&t0, NULL);
+		process_allocation(a, INDEX);
+		gettimeofday(&t1, NULL);
+	
+		float deltaTime = t1.tv_sec - t0.tv_sec + 1E-6 * (t1.tv_usec - t0.tv_usec);
+		mallocTotalTime += deltaTime;		
+
+		gettimeofday(&t0, NULL);
+		process_free(a, INDEX);
+		gettimeofday(&t1, NULL);
+
+		deltaTime = t1.tv_sec - t0.tv_sec + 1E-6 * (t1.tv_usec - t0.tv_usec);
+		freeTotalTime += deltaTime;
+
+		i++;
+	}
+
+	float mallocAverageTime = mallocTotalTime / i;
+	float freeAverageTime = freeTotalTime / i;
+
+	printf("MALLOC - Total time: %.2g seconds (%f)\n", mallocTotalTime, mallocAverageTime);
+	printf("FREE - Total time: %.2g seconds (%f)\n", freeTotalTime, freeAverageTime);
+
+	//show_alloc_mem();
+
+	//show_free_mem();
   
-
-  /*
-  void *p = malloc(7);
-	(void)p;
-	void *p2 = malloc(7);
-	(void)p2;
-	void *p3 = malloc(7);
-	(void)p3;
-
-  show_alloc_mem();
-
-  show_free_mem();
-
-	free(p3);
-  show_free_mem();
-	free(p);
-	free(p2);
-	*/
-
 	return 0;
 }

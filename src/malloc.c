@@ -6,6 +6,8 @@
 #include "malloc.h"
 #include "lst_free.h"
 
+//#define PRINT_MALLOC
+
 t_memlayout MemoryLayout;
 
 // TODO(felix): change this to support multithreaded programs
@@ -22,18 +24,37 @@ void	*map_memory(int ZoneSize) {
 		return NULL;
 	}
 
+#ifdef PRINT_MALLOC
 	PRINT("Successfully mapped "); PRINT_UINT64(ZoneSize); PRINT(" bytes of memory to addr "); PRINT_ADDR(ptrToMappedMemory); NL();
+#endif	
+
 	return ptrToMappedMemory;
 }
 
 t_free	*get_free_slot(t_free **begin_lst, size_t size) {
 	t_free *lst = *begin_lst;
-	if (lst == NULL)
-		return NULL;
 
-	while (lst != NULL && GET_FREE_SIZE(lst) < size) {
+	// First, check for a perfect fit...	
+	while (lst != NULL && GET_FREE_SIZE(lst) != size)
         	lst = lst->Next;
-	}
+
+	if (lst != NULL)
+		return lst;
+
+	lst = *begin_lst;
+	
+	// Then, check for at least a double fit...
+	while (lst != NULL && GET_FREE_SIZE(lst) < size * 2)
+		lst = lst->Next;
+
+	if (lst != NULL)
+		return lst;
+
+	lst = *begin_lst;
+
+	// Then, check for any fit
+	while (lst != NULL && GET_FREE_SIZE(lst) < size)
+		return lst;
 
 	return lst;
 }
@@ -119,8 +140,11 @@ void	*malloc_block(size_t size) {
 		t_header *PrevHdr = Hdr;
 
 		Addr += NewSize;
+
+		// Expensive
 		Hdr = (t_header *)Addr;
 		
+		// here seems to have some bottleneck
 		Hdr->Size = RequestedSize;
 		Hdr->Prev = PrevHdr; 
 		Hdr->Next = PrevHdr->Next;
@@ -142,14 +166,19 @@ void	*malloc_block(size_t size) {
 		}
 	}
 
+	// UNFLAG operation are expensive ??
 	t_header *NextHdr = UNFLAG(Hdr->Next);		
+	// IS_LAST_HDR seems expensive too
 	if (!IS_LAST_HDR(NextHdr)) {
+		// here seems to be ok
 		NextHdr->Prev = FLAG(Hdr);
 	}
 
 	void *AllocatedPtr = GET_SLOT(Addr);
 
+#ifdef PRINT_MALLOC
 	PRINT("Allocated "); PRINT_UINT64(AlignedSize); PRINT(" ["); PRINT_UINT64(RequestedSize); PRINT("] bytes at address "); PRINT_ADDR(AllocatedPtr); NL();
+#endif
 
 	return AllocatedPtr;
 }
