@@ -1,9 +1,10 @@
 #ifndef MALLOC_UTILS_H
 # define MALLOC_UTILS_H
 
-#include "libft.h"
 #include <stdint.h>
+#include <stddef.h>
 
+size_t	ft_strlen(const char *str);
 void	write_uint64(int fd, uint64_t n);
 void	write_uint64_hex(int fd, uint64_t n);
 

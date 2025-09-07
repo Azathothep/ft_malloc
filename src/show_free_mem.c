@@ -1,5 +1,4 @@
 #include "malloc.h"
-#include "lst_free.h"
 #include "utils.h"
 
 //TODO(felix): add chunk subdivision in zones

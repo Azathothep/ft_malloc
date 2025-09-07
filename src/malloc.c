@@ -1,10 +1,9 @@
 #include <unistd.h>
 #include <errno.h>
 #include <sys/mman.h>
-#include "libft.h"
+//#include "libft.h"
 #include "utils.h"
 #include "malloc.h"
-#include "lst_free.h"
 
 //#define PRINT_MALLOC
 
@@ -91,16 +90,16 @@ void	*malloc_block(size_t size) {
 
 	t_memchunks *MemZone = NULL;
 	int MinSlotSize = 0;
-	if (size > SMALL_ALLOC) {
+	if (AlignedSize > SMALL_ALLOC) {
 		MemZone = &MemoryLayout.LargeZone;
 		MinSlotSize = LARGE_SPACE_MIN;
-	} else if (size > TINY_ALLOC) {
+	} else if (AlignedSize > TINY_ALLOC) {
 		MemZone = &MemoryLayout.SmallZone;
 		MinSlotSize = SMALL_SPACE_MIN;
 	} else {
 		MemZone = &MemoryLayout.TinyZone;
 		MinSlotSize = TINY_SPACE_MIN;
-		RequestedSize = TINY_SPACE_MIN;
+		//RequestedSize = TINY_SPACE_MIN;
 	}
 
 	t_free *Slot = get_free_slot(&MemZone->FreeList, RequestedSize);
@@ -109,6 +108,7 @@ void	*malloc_block(size_t size) {
 		int ChunkSize = 0;
 	   	if (size > SMALL_ALLOC) {
 			ChunkSize = LARGE_CHUNK(size);
+		
 			if (ChunkSize < LARGE_ALLOC)
 				ChunkSize = LARGE_ALLOC;
 		} else if (size > TINY_ALLOC) {
@@ -122,13 +122,12 @@ void	*malloc_block(size_t size) {
 			return NULL;
 
 		void *ChunkStartingAddr = CHUNK_STARTING_ADDR(NewChunk);
-		CHUNK_SET_POINTER_TO_FIRST_ALLOC(NewChunk, ChunkStartingAddr); 
 
 		t_header *Hdr = (t_header *)ChunkStartingAddr;
 		Hdr->Prev = NULL;
-		Hdr->Next = GET_LAST_HDR(NewChunk);
+		Hdr->Next = NULL;
 		Hdr->Size = CHUNK_USABLE_SIZE(ChunkSize);
-
+		Hdr->RealSize = Hdr->Size;
 		void *FirstAddr = ChunkStartingAddr + HEADER_SIZE;  
 
  		Slot = lst_free_add(&MemZone->FreeList, FirstAddr);
@@ -149,36 +148,30 @@ void	*malloc_block(size_t size) {
 		Hdr = (t_header *)Addr;
 		
 		// here seems to have some bottleneck
-		Hdr->Size = RequestedSize;
+		Hdr->Size = AlignedSize;
+		Hdr->RealSize = RequestedSize;
 		Hdr->Prev = PrevHdr; 
 		Hdr->Next = PrevHdr->Next;
 
 		PrevHdr->Next = FLAG(Hdr);
 	} else {
-		Hdr->Size = RequestedSize;
+		Hdr->Size = AlignedSize;
 		lst_free_remove(&MemZone->FreeList, Slot);
 
 		t_header *PrevHdr = UNFLAG(Hdr->Prev);
-    PrevHdr = UNFLAG(Hdr->Prev);
+    		PrevHdr = UNFLAG(Hdr->Prev);
 		if (PrevHdr != NULL) {
 			PrevHdr->Next = FLAG(Hdr);
-		} else {
-          		void *ChunkPtr = (void *)Hdr - CHUNK_HEADER;
-
-        		if (ChunkPtr != NULL) {
-				CHUNK_SET_POINTER_TO_FIRST_ALLOC(ChunkPtr, FLAG(Hdr));
-    			}
 		}
+
 	}
 
 	// UNFLAG operation are expensive ??
 	t_header *NextHdr = UNFLAG(Hdr->Next);		
 	NextHdr = UNFLAG(Hdr->Next);
-  // IS_LAST_HDR seems expensive too
-	if (!IS_LAST_HDR(NextHdr)) {
-		// here seems to be ok
+
+	if (NextHdr != NULL)
 		NextHdr->Prev = FLAG(Hdr);
-	}
 
 	void *AllocatedPtr = GET_SLOT(Addr);
 

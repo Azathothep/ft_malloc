@@ -1,5 +1,4 @@
 #include "malloc.h"
-#include "lst_free.h"
 #include "utils.h"
 
 #define ANSI_COLOR_RED		"\x1b[31m"
@@ -10,30 +9,47 @@
 
 void	print_block(t_header *Hdr) {
 	char *color = NULL;
-	if (IS_FLAGGED(Hdr) == 1)
+	char flagged = IS_FLAGGED(Hdr);
+	
+	if (flagged == 1)
 		color = ANSI_COLOR_RED;
 	else
 		color = ANSI_COLOR_GREEN;
+	
 	Hdr = UNFLAG(Hdr);
-	PRINT(color); PRINT_ADDR(Hdr); PRINT(": "); PRINT_UINT64(Hdr->Size); PRINT(" bytes"); PRINT(ANSI_COLOR_RESET); NL();
+
+	PRINT(color); PRINT_ADDR(Hdr); PRINT(": ");
+
+	if (flagged == 1) {
+		PRINT_UINT64(Hdr->Size);
+		PRINT(" ");
+	}
+	
+	PRINT("["); PRINT_UINT64(Hdr->RealSize); PRINT("] "); PRINT(ANSI_COLOR_RESET); NL();
 }
 
 void	show_alloc_zone(t_memchunks *Zone) {
 	void *Chunk = Zone->StartingBlockAddr;
 
-	while (Chunk) {
+	while (Chunk != NULL) {
 		PRINT("CHUNK: "); PRINT_ADDR(Chunk); NL();	
 
-		t_header *Hdr = CHUNK_GET_POINTER_TO_FIRST_ALLOC(Chunk);	
-		
+		t_header *Hdr = CHUNK_STARTING_ADDR(Chunk);//CHUNK_GET_POINTER_TO_FIRST_ALLOC(Chunk);
+	
+		//if (UNFLAG(Hdr) == NULL)
+		//	continue;				
+	
 		print_block(Hdr);
 		
 		Hdr = UNFLAG(Hdr);
 		Hdr = Hdr->Next;
-		while (!IS_LAST_HDR(UNFLAG(Hdr))) {
+
+		t_header *HdrClean = UNFLAG(Hdr);
+		//while (!IS_LAST_HDR(UNFLAG(Hdr))) {
+		while (HdrClean != NULL) {
 			print_block(Hdr);
-			Hdr = UNFLAG(Hdr);
-			Hdr = Hdr->Next;
+			Hdr = HdrClean->Next;
+			HdrClean = UNFLAG(Hdr);
 		}
 		
 		Chunk = GET_NEXT_CHUNK(Chunk);

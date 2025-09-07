@@ -4,6 +4,18 @@
 #define UINT64_MAX_CHAR		20
 #define UINT64_MAX_CHAR_HEX	16
 
+size_t	ft_strlen(const char *s)
+{
+	int	i;
+
+	i = 0;
+	if (!s)
+		return (0);
+	while (s[i])
+		i++;
+	return (i);
+}
+
 void	write_uint64(int fd, uint64_t n) {
 	char str[UINT64_MAX_CHAR];
 

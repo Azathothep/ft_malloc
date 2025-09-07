@@ -2,8 +2,6 @@
 #include <errno.h>
 #include "malloc.h"
 #include "utils.h"
-#include "lst_free.h"
-#include "ft_malloc.h"
 
 #define ANSI_COLOR_RED		"\x1b[31m"
 #define	ANSI_COLOR_GREEN	"\x1b[32m"
@@ -11,17 +9,54 @@
 
 //#define PRINT_FREE
 
+void	*get_free_addr(t_free *Slot) {
+	return (void *)GET_HEADER(Slot);
+}
+
+void	*lst_free_add(t_free **BeginList, void *Addr) {
+	
+	t_free *Slot = (t_free *)Addr;
+	Slot->Prev = NULL;
+	Slot->Next = NULL;
+
+	t_free *List = *BeginList;
+	
+	*BeginList = Slot;
+	Slot->Next = List;
+	
+	if (List != NULL)
+		List->Prev = Slot;
+	
+	return Slot;
+}
+
+void	lst_free_remove(t_free **BeginList, t_free *Slot) {
+	if (*BeginList == Slot) {
+		*BeginList = Slot->Next;
+		return;
+	}
+
+	t_free *Prev = Slot->Prev;
+	t_free *Next = Slot->Next;
+	if (Prev != NULL)
+		Prev->Next = Next;
+
+ 	if (Next != NULL)
+		Next->Prev = Prev;	
+	
+	return;
+}
+
 size_t	coalesce_with_prev(t_header *MiddleHdr) {
 	t_header *PrevHdr = UNFLAG(MiddleHdr->Prev);
 	t_header *NextHdr = UNFLAG(MiddleHdr->Next);
 	
 	PrevHdr->Next = MiddleHdr->Next;
-	if (!IS_LAST_HDR(NextHdr))
+	if (NextHdr != NULL)
 		NextHdr->Prev = MiddleHdr->Prev;
 
-	size_t NewSize = (void *)NextHdr - (void *)PrevHdr;
-	PrevHdr->Size = NewSize;
-	return NewSize;
+	PrevHdr->RealSize += MiddleHdr->RealSize;
+	return PrevHdr->RealSize;
 }
 
 void	free(void *Ptr) {
@@ -59,7 +94,8 @@ void	free(void *Ptr) {
 		PrevHdr = UNFLAG(Hdr->Prev);
   	}
 
-	if (!IS_LAST_HDR(NextHdr) && IS_FLAGGED(Hdr->Next) == 0) {
+	//if (!IS_LAST_HDR(NextHdr) && IS_FLAGGED(Hdr->Next) == 0) {
+	if (NextHdr != NULL && IS_FLAGGED(Hdr->Next) == 0) {
 		t_free *NextSlot = GET_SLOT(NextHdr);
     		lst_free_remove(&MemBlock->FreeList, NextSlot);
     		size_t NewSize = coalesce_with_prev(NextHdr);
@@ -68,20 +104,20 @@ void	free(void *Ptr) {
 		//PRINT("Coalesced with following slot for total size "); PRINT_UINT64(NewSize); NL();
 	}
 	
-	if (!IS_LAST_HDR(NextHdr))
+	//if (!IS_LAST_HDR(NextHdr))
+	if (NextHdr != NULL)
 		NextHdr->Prev = Hdr;
 
 	if (PrevHdr != NULL) {
 		PrevHdr->Next = Hdr;
 	} else {
-    	void *CurrentChunk = ((void *)Hdr - CHUNK_HEADER);	
+    		void *CurrentChunk = ((void *)Hdr - CHUNK_HEADER);	
 	
 		// Unmap ?
 		size_t ChunkSize = GET_CHUNK_SIZE(CurrentChunk);
-		if (Hdr->Size != CHUNK_USABLE_SIZE(ChunkSize)
-			|| CurrentChunk == MemBlock->StartingBlockAddr) {
-			CHUNK_SET_POINTER_TO_FIRST_ALLOC(CurrentChunk, Hdr);
-		} else {
+		if (Hdr->RealSize == CHUNK_USABLE_SIZE(ChunkSize)
+			&& CurrentChunk != MemBlock->StartingBlockAddr) {
+			
 			lst_free_remove(&MemBlock->FreeList, GET_SLOT(Hdr));
 #ifdef PRINT_FREE
       			PRINT(ANSI_COLOR_RED);
