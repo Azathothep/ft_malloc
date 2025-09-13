@@ -1,7 +1,6 @@
 #include <unistd.h>
 #include <errno.h>
 #include <sys/mman.h>
-//#include "libft.h"
 #include "utils.h"
 #include "malloc.h"
 
@@ -30,12 +29,12 @@ void	*map_memory(int ChunkSize) {
 	return ptrToMappedMemory;
 }
 
-t_free	*get_free_slot(t_free **begin_lst, size_t size) {
-	t_free *lst = *begin_lst;
+t_header	*get_free_slot(t_header **begin_lst, size_t size) {
+	t_header *lst = *begin_lst;
 
 	// First, check for a perfect fit...	
-	while (lst != NULL && GET_FREE_SIZE(lst) != size)
-        	lst = lst->Next;
+	while (lst != NULL && lst->RealSize != size) 
+        	lst = lst->NextFree;
 
 	if (lst != NULL)
 		return lst;
@@ -43,8 +42,8 @@ t_free	*get_free_slot(t_free **begin_lst, size_t size) {
 	lst = *begin_lst;
 	
 	// Then, check for at least a double fit...
-	while (lst != NULL && GET_FREE_SIZE(lst) < size * 2)
-		lst = lst->Next;
+	while (lst != NULL && lst->RealSize < size * 2) 
+		lst = lst->NextFree;
 
 	if (lst != NULL)
 		return lst;
@@ -52,8 +51,8 @@ t_free	*get_free_slot(t_free **begin_lst, size_t size) {
 	lst = *begin_lst;
 
 	// Then, check for any fit
-	while (lst != NULL && GET_FREE_SIZE(lst) < size)
-		return lst;
+	while (lst != NULL && lst->RealSize < size) 
+		lst = lst->NextFree;
 
 	return lst;
 }
@@ -90,28 +89,27 @@ void	*malloc_block(size_t size) {
 
 	t_memchunks *MemZone = NULL;
 	int MinSlotSize = 0;
-	if (AlignedSize > SMALL_ALLOC) {
+	if (AlignedSize > SMALL_ALLOC_MAX) {
 		MemZone = &MemoryLayout.LargeZone;
 		MinSlotSize = LARGE_SPACE_MIN;
-	} else if (AlignedSize > TINY_ALLOC) {
+	} else if (AlignedSize > TINY_ALLOC_MAX) {
 		MemZone = &MemoryLayout.SmallZone;
 		MinSlotSize = SMALL_SPACE_MIN;
 	} else {
 		MemZone = &MemoryLayout.TinyZone;
 		MinSlotSize = TINY_SPACE_MIN;
-		//RequestedSize = TINY_SPACE_MIN;
 	}
 
-	t_free *Slot = get_free_slot(&MemZone->FreeList, RequestedSize);
-	if (Slot == NULL) {
+	t_header *Hdr = get_free_slot(&MemZone->FreeList, RequestedSize);
+	if (Hdr == NULL) {
 		// allocated new
 		int ChunkSize = 0;
-	   	if (size > SMALL_ALLOC) {
+	   	if (size > SMALL_ALLOC_MAX) {
 			ChunkSize = LARGE_CHUNK(size);
 		
-			if (ChunkSize < LARGE_ALLOC)
-				ChunkSize = LARGE_ALLOC;
-		} else if (size > TINY_ALLOC) {
+			if (ChunkSize < LARGE_PREALLOC)
+				ChunkSize = LARGE_PREALLOC;
+		} else if (size > TINY_ALLOC_MAX) {
 			ChunkSize = SMALL_CHUNK;
     		} else {
 			ChunkSize = TINY_CHUNK;
@@ -123,31 +121,28 @@ void	*malloc_block(size_t size) {
 
 		void *ChunkStartingAddr = CHUNK_STARTING_ADDR(NewChunk);
 
-		t_header *Hdr = (t_header *)ChunkStartingAddr;
+		Hdr = (t_header *)ChunkStartingAddr;
 		Hdr->Prev = NULL;
 		Hdr->Next = NULL;
 		Hdr->Size = CHUNK_USABLE_SIZE(ChunkSize);
 		Hdr->RealSize = Hdr->Size;
-		void *FirstAddr = ChunkStartingAddr + HEADER_SIZE;  
 
- 		Slot = lst_free_add(&MemZone->FreeList, FirstAddr);
+ 		lst_free_add(&MemZone->FreeList, Hdr);
 	}
 
-	void *Addr = get_free_addr(Slot);	 
-	t_header *Hdr = (t_header *)Addr;
+	//void *Addr = get_free_addr(Slot); 
+	//t_header *Hdr = (t_header *)Addr;
 
-	if (GET_FREE_SIZE(Slot) >= (RequestedSize + MinSlotSize)) { // if there is enough space to make another slot
-		size_t NewSize = GET_FREE_SIZE(Slot) - RequestedSize;
-		SET_FREE_SIZE(Slot, NewSize);
+	if (Hdr->RealSize >= (RequestedSize + MinSlotSize)) {
+		size_t NewSize = Hdr->RealSize - RequestedSize;
+		Hdr->RealSize = NewSize;
 		
 		t_header *PrevHdr = Hdr;
 
-		Addr += NewSize;
+		Hdr = (t_header *)((void *)Hdr + NewSize);
 
-		// Expensive
-		Hdr = (t_header *)Addr;
+		//Hdr = (t_header *)Addr;
 		
-		// here seems to have some bottleneck
 		Hdr->Size = AlignedSize;
 		Hdr->RealSize = RequestedSize;
 		Hdr->Prev = PrevHdr; 
@@ -156,7 +151,7 @@ void	*malloc_block(size_t size) {
 		PrevHdr->Next = FLAG(Hdr);
 	} else {
 		Hdr->Size = AlignedSize;
-		lst_free_remove(&MemZone->FreeList, Slot);
+		lst_free_remove(&MemZone->FreeList, Hdr);
 
 		t_header *PrevHdr = UNFLAG(Hdr->Prev);
     		PrevHdr = UNFLAG(Hdr->Prev);
@@ -173,7 +168,7 @@ void	*malloc_block(size_t size) {
 	if (NextHdr != NULL)
 		NextHdr->Prev = FLAG(Hdr);
 
-	void *AllocatedPtr = GET_SLOT(Addr);
+	void *AllocatedPtr = GET_SLOT(Hdr);
 
 #ifdef PRINT_MALLOC
 	PRINT("Allocated "); PRINT_UINT64(AlignedSize); PRINT(" ["); PRINT_UINT64(RequestedSize); PRINT("] bytes at address "); PRINT_ADDR(AllocatedPtr); NL();

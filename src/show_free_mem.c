@@ -4,10 +4,14 @@
 //TODO(felix): add chunk subdivision in zones
 
 void	show_free_zone(t_memchunks *Zone) {
-	t_free *lst = Zone->FreeList;	
-	
+	//t_free *lst = Zone->FreeList;	
+	t_header *lst = Zone->FreeList;	
+
 	while (lst) {
-		PRINT_ADDR(get_free_addr(lst)); PRINT(": "); PRINT_UINT64(GET_FREE_SIZE(lst)); PRINT(" bytes\n");
+		PRINT_ADDR(lst); PRINT(": ");
+		//PRINT_UINT64(GET_FREE_SIZE(lst));
+		PRINT_UINT64(lst->RealSize);
+		PRINT(" bytes\n");
 		lst = lst->Next;
 	}
 }

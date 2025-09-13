@@ -9,42 +9,33 @@
 
 //#define PRINT_FREE
 
-void	*get_free_addr(t_free *Slot) {
-	return (void *)GET_HEADER(Slot);
-}
-
-void	*lst_free_add(t_free **BeginList, void *Addr) {
+void	lst_free_add(t_header **BeginList, t_header *Hdr) {
 	
-	t_free *Slot = (t_free *)Addr;
-	Slot->Prev = NULL;
-	Slot->Next = NULL;
+	Hdr->PrevFree = NULL;
+	Hdr->NextFree = NULL;
 
-	t_free *List = *BeginList;
-	
-	*BeginList = Slot;
-	Slot->Next = List;
+	t_header *List = *BeginList;	
+
+	*BeginList = Hdr;
+	Hdr->NextFree = List;
 	
 	if (List != NULL)
-		List->Prev = Slot;
-	
-	return Slot;
+		List->PrevFree = Hdr;
 }
 
-void	lst_free_remove(t_free **BeginList, t_free *Slot) {
-	if (*BeginList == Slot) {
-		*BeginList = Slot->Next;
+void	lst_free_remove(t_header **BeginList, t_header *Hdr) {
+	if (*BeginList == Hdr) {
+		*BeginList = Hdr->NextFree;
 		return;
 	}
 
-	t_free *Prev = Slot->Prev;
-	t_free *Next = Slot->Next;
+	t_header *Prev = Hdr->PrevFree;
+	t_header *Next = Hdr->NextFree;
 	if (Prev != NULL)
-		Prev->Next = Next;
+		Prev->NextFree = Next;
 
  	if (Next != NULL)
-		Next->Prev = Prev;	
-	
-	return;
+		Next->PrevFree = Prev;	
 }
 
 size_t	coalesce_with_prev(t_header *MiddleHdr) {
@@ -63,30 +54,30 @@ void	free(void *Ptr) {
 
 	//TODO(felix): verify if block need to be freed beforehand	
 
- 	size_t BlockSize = SLOT_USABLE_SIZE(Ptr);
+	t_header *Hdr = GET_HEADER(Ptr);
+ 	size_t BlockSize = Hdr->Size;
 	
 #ifdef PRINT_FREE
 	PRINT("Freeing address "); PRINT_ADDR(Ptr); PRINT(" (size: "); PRINT_UINT64(BlockSize); PRINT(", Header: "); PRINT_ADDR(GET_HEADER(Ptr)); PRINT(")"); NL();
 #endif
 
   	t_memchunks *MemBlock = NULL;
-	if (BlockSize > SMALL_ALLOC) {
+	if (BlockSize > SMALL_ALLOC_MAX) {
 		MemBlock = &MemoryLayout.LargeZone;
-	} else if (BlockSize > TINY_ALLOC) {
+	} else if (BlockSize > TINY_ALLOC_MAX) {
 		MemBlock = &MemoryLayout.SmallZone;
  	} else {
   		MemBlock = &MemoryLayout.TinyZone;
 	}
 
-	t_free *Slot = lst_free_add(&MemBlock->FreeList, (void *)Ptr);
+	lst_free_add(&MemBlock->FreeList, Hdr);
 
-	t_header *Hdr = GET_HEADER(Slot);
 	t_header *PrevHdr = UNFLAG(Hdr->Prev);
 	t_header *NextHdr = UNFLAG(Hdr->Next);
 
 	//Coalesce
 	if (PrevHdr != NULL && IS_FLAGGED(Hdr->Prev) == 0) {
-    		lst_free_remove(&MemBlock->FreeList, GET_SLOT(Hdr));
+		lst_free_remove(&MemBlock->FreeList, Hdr);
 		size_t NewSize = coalesce_with_prev(Hdr);
 		(void)NewSize;
 		//PRINT("Coalesced with previous slot for total size "); PRINT_UINT64(NewSize); NL();
@@ -94,17 +85,15 @@ void	free(void *Ptr) {
 		PrevHdr = UNFLAG(Hdr->Prev);
   	}
 
-	//if (!IS_LAST_HDR(NextHdr) && IS_FLAGGED(Hdr->Next) == 0) {
 	if (NextHdr != NULL && IS_FLAGGED(Hdr->Next) == 0) {
-		t_free *NextSlot = GET_SLOT(NextHdr);
-    		lst_free_remove(&MemBlock->FreeList, NextSlot);
+    		t_header *NextSlot = NextHdr;
+		lst_free_remove(&MemBlock->FreeList, NextSlot);
     		size_t NewSize = coalesce_with_prev(NextHdr);
 		(void)NewSize;
 		NextHdr = UNFLAG(Hdr->Next);
 		//PRINT("Coalesced with following slot for total size "); PRINT_UINT64(NewSize); NL();
 	}
 	
-	//if (!IS_LAST_HDR(NextHdr))
 	if (NextHdr != NULL)
 		NextHdr->Prev = Hdr;
 
@@ -118,7 +107,7 @@ void	free(void *Ptr) {
 		if (Hdr->RealSize == CHUNK_USABLE_SIZE(ChunkSize)
 			&& CurrentChunk != MemBlock->StartingBlockAddr) {
 			
-			lst_free_remove(&MemBlock->FreeList, GET_SLOT(Hdr));
+			lst_free_remove(&MemBlock->FreeList, Hdr);
 #ifdef PRINT_FREE
       			PRINT(ANSI_COLOR_RED);
  				PRINT("Unmapping chunk at address "); PRINT_ADDR(CurrentChunk); PRINT(" and size "); PRINT_UINT64(ChunkSize); NL();

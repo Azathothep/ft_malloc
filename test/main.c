@@ -79,8 +79,8 @@ void random_allocations(int maxAlloc, size_t maxAllocSize) {
 		i++;
 	}
 
-//	printf("MAX ALLOCATION...\n");
-//	show_alloc_mem();
+	printf("MAX ALLOCATION...\n");
+	show_alloc_mem();
 
 	// freeing two-third of allocations, goes to 1-third
 	i = 0;
@@ -90,8 +90,8 @@ void random_allocations(int maxAlloc, size_t maxAllocSize) {
 		i++;
 	}
 
-//	printf("FREED 2/3...\n");
-//	show_alloc_mem();
+	printf("FREED 2/3...\n");
+	show_alloc_mem();
 
 	// re-allocating one-third, goes to 2-third
 	i = 0;
@@ -101,8 +101,8 @@ void random_allocations(int maxAlloc, size_t maxAllocSize) {
 		i++;
 	}
 
-//	printf("RE-ALLOCATED 1/3, GOES TO 2/3...\n");
-//	show_alloc_mem();
+	printf("RE-ALLOCATED 1/3, GOES TO 2/3...\n");
+	show_alloc_mem();
 
 	// re-freeing one-third, goes to 1-third
 	i = 0;
@@ -112,8 +112,8 @@ void random_allocations(int maxAlloc, size_t maxAllocSize) {
 		i++;
 	}
 
-//	printf("RE-FREED 1/3, GOES TO 1/3...\n");
-//	show_alloc_mem();
+	printf("RE-FREED 1/3, GOES TO 1/3...\n");
+	show_alloc_mem();
 
 	// re-allocating to max, goes to maxAlloc
 	i = ft_lstsize(begin_lst);
@@ -123,14 +123,14 @@ void random_allocations(int maxAlloc, size_t maxAllocSize) {
 		i++;
 	}
 
-//	printf("RE-ALLOCATED TO MAX...\n");
-//	show_alloc_mem();
+	printf("RE-ALLOCATED TO MAX...\n");
+	show_alloc_mem();
 
 	// freeing everything
 	ft_lstclear(&begin_lst, &free);
 
-//	printf("FREED ALL\n");
-//	show_alloc_mem();
+	printf("FREED ALL\n");
+	show_alloc_mem();
 }
 
 int main(int argc, char** argv)
