@@ -78,8 +78,60 @@ void	scan_error(t_header *Hdr, t_header *Prev, char *errmsg) {
 	PRINT("\nNext header\n");
 	scan_hexdump(UNFLAG(Hdr->Next));
 
-//	show_tiny_bins();
+	show_tiny_bins();
 	exit(1);
+}
+
+void	bin_error(t_header *Hdr, char *errmsg) {
+	PRINT(ANSI_COLOR_RED); PRINT("["); PRINT_ADDR(Hdr); PRINT("]: CORRUPTED BINS - "); PRINT(errmsg); PRINT(ANSI_COLOR_RESET); NL();
+
+	PRINT("\n----------------- HEXDUMP -----------------\n");
+	PRINT("\nPrev free header\n");
+	scan_hexdump(Hdr->PrevFree);
+	PRINT("\nCorrupted header\n");
+	scan_hexdump(Hdr);
+	PRINT("\nNext free header\n");
+	scan_hexdump(Hdr->NextFree);
+
+	show_tiny_bins();
+
+	exit(1);
+}
+
+void	search_for_double(t_header **Bins, t_header *to_check, int CurrentBin, int BinCount) {
+	t_header *NextFree = to_check->NextFree;
+	while (CurrentBin < BinCount) {
+		while (NextFree != NULL) {
+			if (to_check == NextFree) {
+				bin_error(to_check, "Header found twice !");
+			}
+
+			NextFree = NextFree->NextFree;
+		}
+
+		CurrentBin++;
+		if (CurrentBin < BinCount)
+			NextFree = Bins[CurrentBin];
+	}
+}
+
+void	scan_free_integrity(t_header **Bins, int BinCount) {
+	int currentBin = 0;
+	
+	while (currentBin < BinCount) {
+		t_header *Hdr = Bins[currentBin];
+		while (Hdr != NULL) {
+			if (Hdr->PrevFree != NULL && Hdr->PrevFree->NextFree != Hdr)
+				bin_error(Hdr, "Inconsistent free headers");
+
+			if (Hdr->NextFree != NULL && Hdr->NextFree->PrevFree != Hdr)
+				bin_error(Hdr, "Inconsistent free headers");
+
+			search_for_double(Bins, Hdr, currentBin, BinCount);
+			Hdr = Hdr->NextFree;
+		}
+		currentBin++;
+	}
 }
 
 void	scan_zone_integrity(t_memchunks *Zone) {
@@ -139,6 +191,7 @@ void	scan_zone_integrity(t_memchunks *Zone) {
 
 void	scan_memory_integrity() {
 	scan_zone_integrity(&MemoryLayout.TinyZone);
+	scan_free_integrity(MemoryLayout.TinyBins, 9);
 	scan_zone_integrity(&MemoryLayout.SmallZone);
 	scan_zone_integrity(&MemoryLayout.LargeZone);
 }

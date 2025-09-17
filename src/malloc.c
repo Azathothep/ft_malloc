@@ -138,7 +138,9 @@ t_header	*get_perfect_or_breakable_tiny_slot(size_t AlignedSize) {
 	// FOUND PERFECT FIT RIGHT AWAY
 	if (index < 8 && TinyBins[index] != NULL) {
 		t_header *Hdr = TinyBins[index];
-		TinyBins[index] = Hdr->NextFree;
+		//TinyBins[index] = Hdr->NextFree;
+		remove_tiny_slot_from_bin(Hdr);
+		//TODO(felix): remove references to Size !i
 		Hdr->Size = AlignedSize; // + HEADER_SIZE
 		PRINT("Found perfect bin\n");
 		return Hdr;
@@ -156,7 +158,8 @@ t_header	*get_perfect_or_breakable_tiny_slot(size_t AlignedSize) {
 
 	if (index < 8) {
 		Hdr = TinyBins[index];
-		TinyBins[index] = Hdr->NextFree;
+		remove_tiny_slot_from_bin(Hdr);
+		//TinyBins[index] = Hdr->NextFree;
 		PRINT("Found breakable slot\n");
 	} else {
 		Hdr = TinyBins[8];
@@ -168,13 +171,14 @@ t_header	*get_perfect_or_breakable_tiny_slot(size_t AlignedSize) {
 		if (Hdr == NULL)
 			return NULL;
 
-		if (Hdr->PrevFree != NULL)
-			Hdr->PrevFree->NextFree = Hdr->NextFree;
-		else
-			TinyBins[8] = Hdr->NextFree;
-
-		if (Hdr->NextFree != NULL)
-			Hdr->NextFree->PrevFree = Hdr->PrevFree;
+//		if (Hdr->PrevFree != NULL)
+//			Hdr->PrevFree->NextFree = Hdr->NextFree;
+//		else
+//			TinyBins[8] = Hdr->NextFree;
+//
+//		if (Hdr->NextFree != NULL)
+//			Hdr->NextFree->PrevFree = Hdr->PrevFree;
+		remove_tiny_slot_from_bin(Hdr);
 	}
 
 	Hdr = break_tiny_slot(Hdr, AlignedSize);
@@ -191,13 +195,13 @@ t_header	*get_tiny_slot(size_t AlignedSize) {
 	// TRY TO COALESCE FREE SLOTS
 	//if (AlignedSize > MIN_ALLOC) {
 	
-/*	coalesce_tiny_slots();
+	coalesce_tiny_slots();
 	Hdr = get_perfect_or_breakable_tiny_slot(AlignedSize);
 				
 	if (Hdr != NULL)
 		return Hdr;
 	//}
-*/
+
 	// ELSE, ALLOCATE NEW CHUNK
 	Hdr = allocate_and_initialize_chunk(&MemoryLayout.TinyZone, TINY_CHUNK);
 	if (Hdr == NULL)

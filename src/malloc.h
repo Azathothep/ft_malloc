@@ -81,6 +81,7 @@ void lst_free_remove(t_header **BeginList, t_header *Hdr);
 
 int get_tiny_bin_index(size_t AlignedSize);
 void put_tiny_slot_in_bin(t_header *Hdr);
+void remove_tiny_slot_from_bin(t_header *Hdr);
 
 void coalesce_tiny_slots();
 
