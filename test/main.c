@@ -5,9 +5,10 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/time.h>
+#include <time.h>
 #include "libft.h"
 
-# define INDEX	1000i
+# define INDEX	1000
 
 void process_allocation(void *a[], int index) {	
 	int i = 0;
@@ -86,7 +87,7 @@ void random_allocations(int maxAlloc, size_t maxAllocSize) {
 	}
 
 	printf("MAX ALLOCATION...\n");
-	show_alloc_mem();
+	//show_alloc_mem();
 
 
 	// freeing two-third of allocations, goes to 1-third
@@ -98,18 +99,18 @@ void random_allocations(int maxAlloc, size_t maxAllocSize) {
 	}
 
 	printf("FREED 2/3...\n");
-	show_alloc_mem();
+	//show_alloc_mem();
 
 	// re-allocating one-third, goes to 2-third
 	i = 0;
-	while (i < third) {
+while (i < third) {
 		size_t size = (rand() % maxAllocSize) + 1;
 		lst_alloc(&begin_lst, size);
 		i++;
 	}
 
 	printf("RE-ALLOCATED 1/3, GOES TO 2/3...\n");
-	show_alloc_mem();
+	//show_alloc_mem();
 
 	// re-freeing one-third, goes to 1-third
 	i = 0;
@@ -120,14 +121,14 @@ void random_allocations(int maxAlloc, size_t maxAllocSize) {
 	}
 
 	printf("RE-FREED 1/3, GOES TO 1/3...\n");
-	show_alloc_mem();
+	//show_alloc_mem();
 
 	// re-allocating to max, goes to maxAlloc
 	i = ft_lstsize(begin_lst);
 	while (i < maxAlloc) {
 		size_t size = (rand() % maxAllocSize) + 1;
 		lst_alloc(&begin_lst, size);
-	//	show_alloc_mem();
+//	show_alloc_mem();
 		i++;
 	}
 
@@ -138,7 +139,7 @@ void random_allocations(int maxAlloc, size_t maxAllocSize) {
 	ft_lstclear(&begin_lst, &free);
 
 	printf("FREED ALL\n");
-	show_alloc_mem();
+	//show_alloc_mem();
 }
 
 int main(int argc, char** argv)
@@ -146,21 +147,32 @@ int main(int argc, char** argv)
 	(void)argc;
 	(void)argv;	
 
+	unsigned int seed = time(NULL);
 	int 	n = 1;
 	int	maxAlloc = 100; // 10
 	size_t 	maxAllocSize = 64; // 4096
 
 	if (argc > 1)
-		n = atoi(argv[1]);
+		seed = atoi(argv[1]);
 
 	if (argc > 2)
-		maxAlloc = atoi(argv[2]);
+		n = atoi(argv[2]);
 
 	if (argc > 3)
-		maxAllocSize = atoi(argv[3]);
+		maxAlloc = atoi(argv[3]);
 
- 	//char *buffer = NULL;
-	//read(0, &buffer, 1);
+	if (argc > 4)
+		maxAllocSize = atoi(argv[4]);
+
+	FILE* file = fopen("seed.txt", "w");
+	char seedchar[32];
+	ft_bzero(seedchar, 32);
+	sprintf(seedchar, "%u", seed);
+	fprintf(file, "%s", seedchar);
+	fclose(file);
+
+	srand(seed);
+ 	printf("SEED: %s\n", seedchar);
 
 	struct timeval t0, t1;
 	float mallocTotalTime = 0;
@@ -177,39 +189,17 @@ int main(int argc, char** argv)
 		i++;
 	}
 
-/*	void *a[INDEX];
-	(void)a;
-
-	float freeTotalTime = 0;
-	
-	while (i < n) {
-		gettimeofday(&t0, NULL);
-		process_allocation(a, INDEX);
-		gettimeofday(&t1, NULL);
-	
-		float deltaTime = t1.tv_sec - t0.tv_sec + 1E-6 * (t1.tv_usec - t0.tv_usec);
-		mallocTotalTime += deltaTime;		
-
-//		show_alloc_mem();
-
-		gettimeofday(&t0, NULL);
-		process_free(a, INDEX);
-		gettimeofday(&t1, NULL);
-
-		deltaTime = t1.tv_sec - t0.tv_sec + 1E-6 * (t1.tv_usec - t0.tv_usec);
-		freeTotalTime += deltaTime;
-
-		i++;
-	}
-
+	show_alloc_mem();
 
 //	float freeAverageTime = freeTotalTime / i;
 
 //	printf("FREE - Total time: %.2g seconds (%f)\n", freeTotalTime, freeAverageTime);
-*/
+
 	float mallocAverageTime = mallocTotalTime / i;
 
 	printf("MALLOC - Total time: %.2g seconds (%f)\n", mallocTotalTime, mallocAverageTime);
+
+	printf("SEED: %s\n", seedchar);
 
 //	show_alloc_mem();
 
