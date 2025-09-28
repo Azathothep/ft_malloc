@@ -125,9 +125,6 @@ t_header	*break_tiny_slot(t_header *Hdr, size_t AllocatedSize) {
 	if (NextHdr != NULL)
 		NextHdr->Prev = FLAG(Hdr);
 	
-	// PUT BROKEN PART TO NEW BIN
-	// put_tiny_slot_in_bin(PrevHdr);	
-
 	return Hdr;
 } 
 
@@ -325,6 +322,8 @@ void	*malloc(size_t size) {
 	//PRINT("Malloc request of size "); PRINT_UINT64(size); NL();
 
 	void *Allocation = malloc_block(size);
+	
 	scan_memory_integrity();
+	
 	return Allocation;
 }

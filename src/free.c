@@ -91,8 +91,6 @@ void	put_tiny_slot_in_bin(t_header *Hdr) {
 
 	int Index = get_tiny_bin_index(BinSize);
 
-	PRINT("put_tiny_slot_in_bin: Hdr = "); PRINT_ADDR(Hdr); PRINT(" ["); PRINT_UINT64(Hdr->RealSize); PRINT("] -> "); PRINT_UINT64(Index); NL();
-
 	t_header **TinyBins = MemoryLayout.TinyBins;
 	t_header *NextHdrInBin = TinyBins[Index];
 
@@ -106,7 +104,6 @@ void	put_tiny_slot_in_bin(t_header *Hdr) {
 
 void	remove_tiny_slot_from_bin(t_header *Hdr) {
 	int index = get_tiny_bin_index(Hdr->RealSize - HEADER_SIZE);
-	PRINT("remove_tiny_slot_from_bin: "); PRINT_ADDR(Hdr); PRINT("["); PRINT_UINT64(Hdr->RealSize); PRINT("] -> "); PRINT_UINT64(index); NL();
 
 	if (Hdr->PrevFree != NULL) { 
 		Hdr->PrevFree->NextFree = Hdr->NextFree;
@@ -121,8 +118,7 @@ void	remove_tiny_slot_from_bin(t_header *Hdr) {
 	Hdr->NextFree = NULL;
 }
 
-t_header	*try_coalesce_tiny_slot(t_header *Hdr) {
-	PRINT("TRYING TO COALESCE "); PRINT_ADDR(Hdr); NL();
+void	try_coalesce_tiny_slot(t_header *Hdr, t_header **NextHdrToCheck) {
 	t_header *NextFree = Hdr->NextFree;
 
 	t_header *Base = Hdr;
@@ -134,20 +130,19 @@ t_header	*try_coalesce_tiny_slot(t_header *Hdr) {
 		Prev = UNFLAG(Base->Prev);
 	}
 
-	PRINT("BACKTRACKED TO "); PRINT_ADDR(Base); PRINT(", Prev = "); PRINT_ADDR(Base->Prev); NL();
 	
 	size_t NewSize = Base->RealSize;
 	t_header *Current = Base;
 	t_header *Next = UNFLAG(Current->Next);
 	
 	while (Next != NULL && IS_FLAGGED(Current->Next) == 0) {
-		while (NextFree != NULL // TODO(felix): can remove NULL check: next check implicitly checks it 
-		&& (uint64_t)NextFree > (uint64_t)Base
-		&& (uint64_t)NextFree <= (uint64_t)Next)
+	
+		while (NextFree != NULL 
+			&& (uint64_t)NextFree > (uint64_t)Base
+			&& (uint64_t)NextFree <= (uint64_t)Next)
 			NextFree = NextFree->NextFree;
 
 		Current = Next;
-		PRINT("Merging "); PRINT_ADDR(Base); PRINT(" ["); PRINT_UINT64(Base->RealSize); PRINT("] and "); PRINT_ADDR(Current); PRINT(" ["); PRINT_UINT64(Current->RealSize); PRINT("]"); NL();
 		NewSize += Current->RealSize;
 		remove_tiny_slot_from_bin(Current);
 		Next = UNFLAG(Current->Next);
@@ -165,23 +160,19 @@ t_header	*try_coalesce_tiny_slot(t_header *Hdr) {
 		put_tiny_slot_in_bin(Base);
 	}
 
-  	scan_memory_integrity();
+	*NextHdrToCheck = NextFree;
 
-	return NextFree;
+  	scan_memory_integrity();
 }
 
 void	coalesce_tiny_slots() {
 	int i = 0;
 
-	//show_alloc_mem();
-	//show_tiny_bins();
-
-	while (i < 9) {
+	while (i < TINY_BINS_COUNT) {
 		t_header *Hdr = MemoryLayout.TinyBins[i];
-		PRINT("Coalescing slot index: "); PRINT_UINT64(i); NL();
 
 		while (Hdr != NULL) {
-			Hdr = try_coalesce_tiny_slot(Hdr);
+			try_coalesce_tiny_slot(Hdr, &Hdr);
 		}	
 
 		i++;
@@ -189,9 +180,6 @@ void	coalesce_tiny_slots() {
 }
 
 void	free_tiny_slot(t_header *Hdr) {
-#ifdef PRINT_FREE
-	//PRINT("Freeing tiny slot "); PRINT_ADDR(GET_SLOT(Hdr)); NL();
-#endif
 	t_header *HdrPrev = UNFLAG(Hdr->Prev);
 	t_header *HdrNext = UNFLAG(Hdr->Next);
 
@@ -202,9 +190,6 @@ void	free_tiny_slot(t_header *Hdr) {
 		HdrPrev->Next = Hdr;	
 
 	put_tiny_slot_in_bin(Hdr);	
-#ifdef PRINT_FREE	
-//	show_tiny_bins();
-#endif
 }
 
 // ----------- FREE ------------ //
@@ -272,7 +257,7 @@ void	free(void *Ptr) {
 			lst_free_remove(&MemBlock->FreeList, Hdr);
 #ifdef PRINT_FREE
       			PRINT(ANSI_COLOR_RED);
- 				PRINT("Unmapping chunk at address "); PRINT_ADDR(CurrentChunk); PRINT(" and size "); PRINT_UINT64(ChunkSize); NL();
+ 			PRINT("Unmapping chunk at address "); PRINT_ADDR(CurrentChunk); PRINT(" and size "); PRINT_UINT64(ChunkSize); NL();
       			PRINT(ANSI_COLOR_RESET);
 #endif
 			void *PrevChunk = GET_PREV_CHUNK(CurrentChunk);
