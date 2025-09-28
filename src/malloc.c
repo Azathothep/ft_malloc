@@ -4,7 +4,7 @@
 #include "utils.h"
 #include "malloc.h"
 
-//#define PRINT_MALLOC
+#define PRINT_MALLOC
 
 t_memlayout MemoryLayout;
 
@@ -146,8 +146,25 @@ t_header	*get_perfect_tiny_slot(size_t AlignedSize) {
 	return Hdr;
 }
 
+t_header	*get_perfect_small_slot(size_t AlignedSize) {
+	int index = get_small_bin_index(AlignedSize);
+
+	t_header **Bins = MemoryLayout.SmallBins;
+	
+	t_header *Hdr = NULL;
+
+	if (index >= SMALL_BINS_DUMP || Bins[index] == NULL)
+		return NULL;
+
+	Hdr = Bins[index];
+	remove_small_slot_from_bin(Hdr);
+
+	Hdr->Size = AlignedSize;
+	return Hdr;
+}
+
 t_header	*get_breakable_tiny_slot(size_t AlignedSize) {
-	size_t MinSlotSizeToBreak = MIN_ALLOC + (HEADER_SIZE + AlignedSize);
+	size_t MinSlotSizeToBreak = MIN_TINY_ALLOC + (HEADER_SIZE + AlignedSize);
 	int index = get_tiny_bin_index(MinSlotSizeToBreak);
 
 	t_header **TinyBins = MemoryLayout.TinyBins;
@@ -176,6 +193,36 @@ t_header	*get_breakable_tiny_slot(size_t AlignedSize) {
 	return Hdr;
 }
 
+t_header	*get_breakable_small_slot(size_t AlignedSize) {
+	size_t MinSlotSizeToBreak = MIN_SMALL_ALLOC + (HEADER_SIZE + AlignedSize);
+	int index = get_small_bin_index(MinSlotSizeToBreak);
+
+	t_header **Bins = MemoryLayout.SmallBins;
+
+	while (index < SMALL_BINS_DUMP && Bins[index] == NULL) {
+		index++;
+	}
+
+	t_header *Hdr = NULL;
+
+	if (index < SMALL_BINS_DUMP) {
+		Hdr = Bins[index];
+	} else {
+		Hdr = Bins[SMALL_BINS_DUMP];
+		while (Hdr != NULL
+			&& Hdr->RealSize < (HEADER_SIZE + MinSlotSizeToBreak)) {
+		
+			Hdr = Hdr->NextFree;
+		}
+
+		if (Hdr == NULL)
+			return NULL;
+	}
+
+	remove_small_slot_from_bin(Hdr);
+	return Hdr;
+}
+
 t_header	*get_perfect_or_break_tiny_slot(size_t AlignedSize) {
 	t_header *Hdr = get_perfect_tiny_slot(AlignedSize);
 
@@ -190,6 +237,23 @@ t_header	*get_perfect_or_break_tiny_slot(size_t AlignedSize) {
 	t_header *ToBreak = Hdr;
 	Hdr = break_tiny_slot(ToBreak, AlignedSize);
 	put_tiny_slot_in_bin(ToBreak);
+	return Hdr;
+}
+
+t_header	*get_perfect_or_break_small_slot(size_t AlignedSize) {
+	t_header *Hdr = get_perfect_small_slot(AlignedSize);
+
+	if (Hdr != NULL)
+		return Hdr;
+
+	Hdr = get_breakable_small_slot(AlignedSize);
+
+	if (Hdr == NULL)
+		return NULL;
+
+	t_header *ToBreak = Hdr;
+	Hdr = break_tiny_slot(ToBreak, AlignedSize);
+	put_small_slot_in_bin(ToBreak);
 	return Hdr;
 }
 
@@ -219,7 +283,30 @@ t_header	*get_tiny_slot(size_t AlignedSize) {
 	return Hdr;
 }
 
-t_header	*get_small_large_slot(size_t AlignedSize) {	
+t_header	*get_small_slot(size_t AlignedSize) {
+	t_header *Hdr = get_perfect_or_break_small_slot(AlignedSize);
+
+	if (Hdr != NULL)
+		return Hdr;
+
+	coalesce_small_slots();
+	Hdr = get_perfect_or_break_small_slot(AlignedSize);
+
+	if (Hdr != NULL)
+		return Hdr;
+
+	Hdr = allocate_and_initialize_chunk(&MemoryLayout.SmallZone, SMALL_CHUNK);
+	if (Hdr == NULL)
+		return NULL;
+
+	t_header *ToBreak = Hdr;
+	Hdr = break_tiny_slot(ToBreak, AlignedSize);
+	put_small_slot_in_bin(ToBreak);
+
+	return Hdr;
+}
+
+t_header	*get_large_slot(size_t AlignedSize) {	
 	size_t RequestedSize = AlignedSize + HEADER_SIZE;
 		
 	t_memchunks *MemZone = NULL;
@@ -288,12 +375,14 @@ void	*malloc_block(size_t size) {
 	
 	if (AlignedSize <= TINY_ALLOC_MAX) {
 		
-		if (AlignedSize < MIN_ALLOC)
-			AlignedSize = MIN_ALLOC;
+		if (AlignedSize < MIN_TINY_ALLOC)
+			AlignedSize = MIN_TINY_ALLOC;
 
 		Hdr = get_tiny_slot(AlignedSize);		
+	} else if (AlignedSize <= SMALL_ALLOC_MAX) {
+		Hdr = get_small_slot(AlignedSize);
 	} else {
-		Hdr = get_small_large_slot(AlignedSize);
+		Hdr = get_large_slot(AlignedSize);
 	}
 	
 	t_header *NextHdr = UNFLAG(Hdr->Next);		
@@ -320,6 +409,9 @@ void	*malloc_block(size_t size) {
 
 void	*malloc(size_t size) {
 	//PRINT("Malloc request of size "); PRINT_UINT64(size); NL();
+
+	if (size == 0)
+		return NULL;
 
 	void *Allocation = malloc_block(size);
 	

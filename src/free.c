@@ -81,9 +81,16 @@ void	show_tiny_bins() {
 
 int	get_tiny_bin_index(size_t AlignedSize) {
 	if (AlignedSize > TINY_ALLOC_MAX)
-		return 8;
+		return TINY_BINS_DUMP;
 
-	return (AlignedSize / 8) - 1;
+	return (AlignedSize / ALIGNMENT) - 1;
+}
+
+int	get_small_bin_index(size_t AlignedSize) {
+	if (AlignedSize > SMALL_ALLOC_MAX)
+		return SMALL_BINS_DUMP;
+
+	return ((AlignedSize - TINY_ALLOC_MAX) / ALIGNMENT) - 1;
 }
 
 void	put_tiny_slot_in_bin(t_header *Hdr) {
@@ -102,6 +109,22 @@ void	put_tiny_slot_in_bin(t_header *Hdr) {
 		NextHdrInBin->PrevFree = Hdr;
 }
 
+void	put_small_slot_in_bin(t_header *Hdr) {
+	int BinSize = Hdr->RealSize - HEADER_SIZE;
+
+	int Index = get_small_bin_index(BinSize);
+	
+	t_header **Bins = MemoryLayout.SmallBins;
+	t_header *NextHdrInBin = Bins[Index];
+
+	Bins[Index] = Hdr;
+	Hdr->PrevFree = NULL;
+	Hdr->NextFree = NextHdrInBin;
+
+	if (NextHdrInBin != NULL)
+		NextHdrInBin->PrevFree = Hdr;
+}
+
 void	remove_tiny_slot_from_bin(t_header *Hdr) {
 	int index = get_tiny_bin_index(Hdr->RealSize - HEADER_SIZE);
 
@@ -109,6 +132,22 @@ void	remove_tiny_slot_from_bin(t_header *Hdr) {
 		Hdr->PrevFree->NextFree = Hdr->NextFree;
 	} else {
 		MemoryLayout.TinyBins[index] = Hdr->NextFree;	
+	}
+
+	if (Hdr->NextFree != NULL)
+		Hdr->NextFree->PrevFree = Hdr->PrevFree;
+
+	Hdr->PrevFree = NULL;
+	Hdr->NextFree = NULL;
+}
+
+void	remove_small_slot_from_bin(t_header *Hdr) {
+	int index = get_small_bin_index(Hdr->RealSize - HEADER_SIZE);
+
+	if (Hdr->PrevFree != NULL) { 
+		Hdr->PrevFree->NextFree = Hdr->NextFree;
+	} else {
+		MemoryLayout.SmallBins[index] = Hdr->NextFree;	
 	}
 
 	if (Hdr->NextFree != NULL)
@@ -165,6 +204,53 @@ void	try_coalesce_tiny_slot(t_header *Hdr, t_header **NextHdrToCheck) {
   	scan_memory_integrity();
 }
 
+void	try_coalesce_small_slot(t_header *Hdr, t_header **NextHdrToCheck) {
+	t_header *NextFree = Hdr->NextFree;
+
+	t_header *Base = Hdr;
+	t_header *Prev = UNFLAG(Base->Prev);
+
+	//TODO(felix): optimize this part & start coalescing when backtracking
+	while (Prev != NULL && IS_FLAGGED(Base->Prev) == 0) {
+		Base = Prev;
+		Prev = UNFLAG(Base->Prev);
+	}
+
+	
+	size_t NewSize = Base->RealSize;
+	t_header *Current = Base;
+	t_header *Next = UNFLAG(Current->Next);
+	
+	while (Next != NULL && IS_FLAGGED(Current->Next) == 0) {
+	
+		while (NextFree != NULL 
+			&& (uint64_t)NextFree > (uint64_t)Base
+			&& (uint64_t)NextFree <= (uint64_t)Next)
+			NextFree = NextFree->NextFree;
+
+		Current = Next;
+		NewSize += Current->RealSize;
+		remove_small_slot_from_bin(Current);
+		Next = UNFLAG(Current->Next);
+	}
+
+	if (Base->RealSize != NewSize) { 
+		remove_small_slot_from_bin(Base);
+		Base->RealSize = NewSize;
+		Base->Size = NewSize - HEADER_SIZE; 
+		Base->Next = Current->Next;
+
+		if (Next != NULL)
+			Next->Prev = Base;
+	
+		put_small_slot_in_bin(Base);
+	}
+
+	*NextHdrToCheck = NextFree;
+
+  	scan_memory_integrity();
+}
+
 void	coalesce_tiny_slots() {
 	int i = 0;
 
@@ -174,6 +260,20 @@ void	coalesce_tiny_slots() {
 		while (Hdr != NULL) {
 			try_coalesce_tiny_slot(Hdr, &Hdr);
 		}	
+
+		i++;
+	}
+}
+
+void	coalesce_small_slots() {
+	int i = 0;
+
+	while (i < SMALL_BINS_COUNT) {
+		t_header *Hdr = MemoryLayout.SmallBins[i];
+
+		while (Hdr != NULL) {
+			try_coalesce_small_slot(Hdr, &Hdr);
+		}
 
 		i++;
 	}
@@ -190,6 +290,19 @@ void	free_tiny_slot(t_header *Hdr) {
 		HdrPrev->Next = Hdr;	
 
 	put_tiny_slot_in_bin(Hdr);	
+}
+
+void	free_small_slot(t_header *Hdr) {
+	t_header *HdrPrev = UNFLAG(Hdr->Prev);
+	t_header *HdrNext = UNFLAG(Hdr->Next);
+
+	if (HdrNext != NULL)
+		HdrNext->Prev = Hdr;
+
+	if (HdrPrev != NULL)
+		HdrPrev->Next = Hdr;
+
+	put_small_slot_in_bin(Hdr);
 }
 
 // ----------- FREE ------------ //
@@ -209,8 +322,10 @@ void	free(void *Ptr) {
 	if (BlockSize > SMALL_ALLOC_MAX) {
 		MemBlock = &MemoryLayout.LargeZone;
 	} else if (BlockSize > TINY_ALLOC_MAX) {
-		MemBlock = &MemoryLayout.SmallZone;
- 	} else {
+		free_small_slot(Hdr);
+		scan_memory_integrity();
+ 		return;
+	} else {
   		//MemBlock = &MemoryLayout.TinyZone;
 		free_tiny_slot(Hdr);
 		scan_memory_integrity();

@@ -22,11 +22,15 @@ typedef struct	s_memchunks {
 # define TINY_BINS_COUNT	9
 # define TINY_BINS_DUMP		(TINY_BINS_COUNT - 1)
 
+# define SMALL_BINS_COUNT	121
+# define SMALL_BINS_DUMP	(SMALL_BINS_COUNT - 1)
+
 typedef struct	s_memlayout {
 	t_memchunks	TinyZone;
 	t_header	*TinyBins[TINY_BINS_COUNT];	
 	
 	t_memchunks	SmallZone;
+	t_header	*SmallBins[SMALL_BINS_COUNT];
 	
 	t_memchunks	LargeZone;
 }		t_memlayout;
@@ -45,6 +49,8 @@ extern	t_memlayout MemoryLayout;
 
 # define HEADER_SIZE		32
 # define MIN_ALLOC		16
+# define MIN_TINY_ALLOC		MIN_ALLOC
+# define MIN_SMALL_ALLOC	TINY_ALLOC_MAX
 # define CHUNK_HEADER     	(sizeof(size_t) + sizeof(void *)) // size of chunk + pointer to previous chunk
 # define CHUNK_FOOTER	    	(sizeof(void *) + sizeof(void *)) // last header pointer + pointer to next chunk
 # define CHUNK_OVERHEAD		(CHUNK_HEADER + CHUNK_FOOTER)
@@ -83,10 +89,14 @@ void lst_free_add(t_header **BeginList, t_header *Hdr);
 void lst_free_remove(t_header **BeginList, t_header *Hdr);
 
 int get_tiny_bin_index(size_t AlignedSize);
+int get_small_bin_index(size_t AlignedSize);
 void put_tiny_slot_in_bin(t_header *Hdr);
+void put_small_slot_in_bin(t_header *Hdr);
 void remove_tiny_slot_from_bin(t_header *Hdr);
+void remove_small_slot_from_bin(t_header *Hdr);
 
 void coalesce_tiny_slots();
+void coalesce_small_slots();
 
 void show_tiny_bins();
 void scan_memory_integrity();

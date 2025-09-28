@@ -78,7 +78,7 @@ void	scan_error(t_header *Hdr, t_header *Prev, char *errmsg) {
 	PRINT("\nNext header\n");
 	scan_hexdump(UNFLAG(Hdr->Next));
 
-	show_tiny_bins();
+	//show_tiny_bins();
 	exit(1);
 }
 
