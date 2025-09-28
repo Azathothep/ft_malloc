@@ -10,7 +10,7 @@ t_memlayout MemoryLayout = {
 	NULL,
 	NULL,
 	TINY_BINS_COUNT,
-	{ NULL },
+	{ },
 
 	NULL,
 	NULL,

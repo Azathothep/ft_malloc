@@ -78,11 +78,10 @@ void	scan_error(t_header *Hdr, t_header *Prev, char *errmsg) {
 	PRINT("\nNext header\n");
 	scan_hexdump(UNFLAG(Hdr->Next));
 
-	//show_tiny_bins();
 	exit(1);
 }
 
-void	bin_error(t_header *Hdr, char *errmsg) {
+void	bin_error(t_header *Hdr, char *errmsg, t_memchunks *Zone) {
 	PRINT(ANSI_COLOR_RED); PRINT("["); PRINT_ADDR(Hdr); PRINT("]: CORRUPTED BINS - "); PRINT(errmsg); PRINT(ANSI_COLOR_RESET); NL();
 
 	PRINT("\n----------------- HEXDUMP -----------------\n");
@@ -93,41 +92,43 @@ void	bin_error(t_header *Hdr, char *errmsg) {
 	PRINT("\nNext free header\n");
 	scan_hexdump(Hdr->NextFree);
 
-	show_tiny_bins();
+	show_bins(Zone);
 
 	exit(1);
 }
 
-void	search_for_double(t_header **Bins, t_header *to_check, int CurrentBin, int BinCount) {
+void	search_for_double(t_memchunks *Zone, t_header *to_check, int CurrentBin) {
+	t_header **Bins = Zone->Bins;
 	t_header *NextFree = to_check->NextFree;
-	while (CurrentBin < BinCount) {
+	while (CurrentBin < Zone->BinsCount) {
 		while (NextFree != NULL) {
 			if (to_check == NextFree) {
-				bin_error(to_check, "Header found twice !");
+				bin_error(to_check, "Header found twice !", Zone);
 			}
 
 			NextFree = NextFree->NextFree;
 		}
 
 		CurrentBin++;
-		if (CurrentBin < BinCount)
+		if (CurrentBin < Zone->BinsCount)
 			NextFree = Bins[CurrentBin];
 	}
 }
 
-void	scan_free_integrity(t_header **Bins, int BinCount) {
+void	scan_free_integrity(t_memchunks *Zone) {
 	int currentBin = 0;
+	t_header **Bins = Zone->Bins;
 	
-	while (currentBin < BinCount) {
+	while (currentBin < Zone->BinsCount) {
 		t_header *Hdr = Bins[currentBin];
 		while (Hdr != NULL) {
 			if (Hdr->PrevFree != NULL && Hdr->PrevFree->NextFree != Hdr)
-				bin_error(Hdr, "Inconsistent free headers");
+				bin_error(Hdr, "Inconsistent free headers", Zone);
 
 			if (Hdr->NextFree != NULL && Hdr->NextFree->PrevFree != Hdr)
-				bin_error(Hdr, "Inconsistent free headers");
+				bin_error(Hdr, "Inconsistent free headers", Zone);
 
-			search_for_double(Bins, Hdr, currentBin, BinCount);
+			search_for_double(Zone, Hdr, currentBin);
 			Hdr = Hdr->NextFree;
 		}
 		currentBin++;
@@ -192,11 +193,11 @@ void	scan_zone_integrity(t_memchunks *Zone) {
 void	scan_memory_integrity() {
 	t_memchunks *Zone = GET_TINY_ZONE();
 	scan_zone_integrity(Zone);
-	scan_free_integrity(Zone->Bins, 9);
+	scan_free_integrity(Zone);
 
 	Zone = GET_SMALL_ZONE();
 	scan_zone_integrity(Zone);
-	scan_free_integrity(Zone->Bins, 121);	
+	scan_free_integrity(Zone);	
 
 	Zone = GET_LARGE_ZONE();
 	scan_zone_integrity(Zone);

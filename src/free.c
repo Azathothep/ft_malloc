@@ -51,17 +51,15 @@ size_t	coalesce_with_prev(t_header *MiddleHdr) {
 	return PrevHdr->RealSize;
 }
 
-// --------- TINY BIN ---------- //
+// --------- BINS ---------- //
 
-void	show_tiny_bins() {
-	PRINT("TINY BINS\n");
+void	show_bins(t_memchunks *Zone) {
+	PRINT("BINS\n");
 
-	t_memchunks* Zone = GET_TINY_ZONE();
-	t_header **TinyBins = Zone->Bins;
-	//t_header **TinyBins = MemoryLayout.TinyBins;
+	t_header **Bins = Zone->Bins;
 
 	int i = 0;
-	while (i < 9) {
+	while (i < Zone->BinsCount) {
 		PRINT("["); PRINT_UINT64(i); PRINT("] (");
 		if (i < 8)
 			PRINT_UINT64((i + 1) * 8);
@@ -70,7 +68,7 @@ void	show_tiny_bins() {
 
 		PRINT(")"); NL();
 		
-		t_header *Ptr = TinyBins[i];
+		t_header *Ptr = Bins[i];
 		while (Ptr != NULL) {
 			PRINT_ADDR(Ptr); NL();
 			Ptr = Ptr->NextFree;
