@@ -100,21 +100,37 @@ void	put_slot_in_bin(t_header *Hdr, t_memchunks *Zone) {
 	int Index = get_bin_index(BinSize, Zone->ZoneType);
 
 	t_header **Bins = Zone->Bins;
-	t_header *NextHdrInBin = Bins[Index];
 
 	if (Zone->ZoneType != LARGE) {
+		t_header *NextHdrInBin = Bins[Index];
+		
 		Bins[Index] = Hdr;
 		Hdr->PrevFree = NULL;
 		Hdr->NextFree = NextHdrInBin;
+		
+		if (NextHdrInBin != NULL)
+			NextHdrInBin->PrevFree = Hdr;
 	} else {
-		// TODO: put in order, from largest to tinyest
-		Bins[Index] = Hdr;
-		Hdr->PrevFree = NULL;
-		Hdr->NextFree = NextHdrInBin;
-	}
+		t_header *HdrIter = Bins[Index];
 
-	if (NextHdrInBin != NULL)
-		NextHdrInBin->PrevFree = Hdr;
+		t_header *PrevHdrIter = NULL;
+
+		while (HdrIter != NULL && HdrIter->RealSize > Hdr->RealSize) {
+			PrevHdrIter = HdrIter;
+			HdrIter = HdrIter->NextFree;
+		}
+
+		Hdr->NextFree = HdrIter;
+		Hdr->PrevFree = PrevHdrIter;
+
+		if (HdrIter != NULL)
+			HdrIter->PrevFree = Hdr;
+
+		if (PrevHdrIter != NULL)
+			PrevHdrIter->NextFree = Hdr;
+		else
+			Bins[Index] = Hdr;
+	}
 }
 
 void	remove_slot_from_bin(t_header *Hdr, t_memchunks *Zone) {

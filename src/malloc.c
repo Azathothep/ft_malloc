@@ -110,8 +110,14 @@ t_header *get_slot_of_size_in_large_bin(size_t RequestedSize, t_memchunks *Zone,
 		return Zone->Bins[BinIndex];
 
 	t_header *Hdr = Zone->Bins[BinIndex];
-	while (Hdr != NULL && Hdr->RealSize < RequestedSize)
+	while (Hdr != NULL) {
+		if (Hdr->RealSize >= RequestedSize 						// If large enough...
+			&& (Hdr->NextFree == NULL							// and is last one
+				|| Hdr->NextFree->RealSize < RequestedSize)) 	// or next one is too small
+			break;
+
 		Hdr = Hdr->NextFree;
+	}
 
 	return Hdr;
 }
