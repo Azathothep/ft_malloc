@@ -128,7 +128,7 @@ int get_bin_index(size_t AlignedSize, t_zonetype ZoneType) {
 			result = SMALL_BINS_DUMP;
 		else
 			result = ((AlignedSize - TINY_ALLOC_MAX) / ALIGNMENT) - 1;
-	} else if (ZoneType == LARGE) {
+	} else {
 		result = get_large_bin_index(AlignedSize);
 	}
 
@@ -148,7 +148,10 @@ void	put_slot_in_bin(t_header *Hdr, t_memchunks *Zone) {
 		Hdr->PrevFree = NULL;
 		Hdr->NextFree = NextHdrInBin;
 	} else {
-		// TODO: put in order, from tinyest to largest
+		// TODO: put in order, from largest to tinyest
+		Bins[Index] = Hdr;
+		Hdr->PrevFree = NULL;
+		Hdr->NextFree = NextHdrInBin;
 	}
 
 	if (NextHdrInBin != NULL)
@@ -246,7 +249,7 @@ void	free_slot(t_header *Hdr, t_zonetype ZoneType) {
 		Zone = GET_TINY_ZONE();
 	else if (ZoneType == SMALL)
 		Zone = GET_SMALL_ZONE();
-	else if (ZoneType == LARGE)
+	else
 		Zone = GET_LARGE_ZONE();
 
 	put_slot_in_bin(Hdr, Zone);
@@ -333,7 +336,7 @@ void	free(void *Ptr) {
 #endif
 
 	if (BlockSize > SMALL_ALLOC_MAX) {
-		free_large_slot(Hdr);
+		free_slot(Hdr, LARGE);
 	} else if (BlockSize > TINY_ALLOC_MAX) {
 		free_slot(Hdr, SMALL);
 	} else {
