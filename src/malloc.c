@@ -35,35 +35,6 @@ void	*map_memory(int ChunkSize) {
 	return ptrToMappedMemory;
 }
 
-
-t_header	*get_free_slot(t_header **begin_lst, size_t size) {
-	t_header *lst = *begin_lst;
-
-	// First, check for a perfect fit...	
-	while (lst != NULL && lst->RealSize != size) 
-        	lst = lst->NextFree;
-
-	if (lst != NULL)
-		return lst;
-
-	lst = *begin_lst;
-	
-	// Then, check for at least a double fit...
-	while (lst != NULL && lst->RealSize < size * 2) 
-		lst = lst->NextFree;
-
-	if (lst != NULL)
-		return lst;
-
-	lst = *begin_lst;
-
-	// Then, check for any fit
-	while (lst != NULL && lst->RealSize < size) 
-		lst = lst->NextFree;
-
-	return lst;
-}
-
 void	*alloc_chunk(t_memchunks *MemZone, size_t ChunkSize) {
 	void *NewChunk = map_memory(ChunkSize);
 	if (NewChunk == NULL)
@@ -134,27 +105,15 @@ t_header	*break_slot(t_header *Hdr, size_t AllocatedSize) {
 	return Hdr;
 }
 
-t_header *get_large_good_enough_slot(size_t AlignedSize) {
-	int index = get_bin_index(AlignedSize, LARGE);
+t_header *get_slot_of_size_in_large_bin(size_t RequestedSize, t_memchunks *Zone, int BinIndex) {
+	if (Zone->ZoneType != LARGE)
+		return Zone->Bins[BinIndex];
 
-	t_header *Hdr = NULL;
-	t_memchunks *Zone = GET_LARGE_ZONE();
-
-	if (index >= LARGE_BINS_DUMP)
-		return NULL;
-
-	Hdr = Zone->Bins[index];
-	while (Hdr != NULL && Hdr->RealSize < AlignedSize + HEADER_SIZE)
+	t_header *Hdr = Zone->Bins[BinIndex];
+	while (Hdr != NULL && Hdr->RealSize < RequestedSize)
 		Hdr = Hdr->NextFree;
-		
-	if (Hdr == NULL)
-		return NULL;
 
-	remove_slot_from_bin(Hdr, Zone);
-
-	Hdr->Size = AlignedSize;
 	return Hdr;
-
 }
 
 t_header *get_perfect_slot(size_t AlignedSize, t_memchunks *Zone) {
@@ -167,11 +126,21 @@ t_header *get_perfect_slot(size_t AlignedSize, t_memchunks *Zone) {
 		bin_dump = TINY_BINS_DUMP;
 	else if (Zone->ZoneType == SMALL)
 		bin_dump = SMALL_BINS_DUMP;
+	else
+		bin_dump = LARGE_BINS_DUMP;
 	
-	if (index >= bin_dump || Zone->Bins[index] == NULL)
+	if (index >= bin_dump)
 		return NULL;
 
-	Hdr = Zone->Bins[index];
+	if (Zone->ZoneType == LARGE) {
+		Hdr = get_slot_of_size_in_large_bin(AlignedSize + HEADER_SIZE, Zone, index);
+	} else {
+		Hdr = Zone->Bins[index];
+	}
+
+	if (Hdr == NULL)
+		return NULL;
+
 	remove_slot_from_bin(Hdr, Zone);
 
 	Hdr->Size = AlignedSize;
@@ -197,28 +166,25 @@ t_header	*get_breakable_slot(size_t AlignedSize, t_memchunks *Zone) {
 	size_t MinSlotSizeToBreak = min_alloc + (HEADER_SIZE + AlignedSize);
 	int index = get_bin_index(MinSlotSizeToBreak, Zone->ZoneType);
 
+	t_header *Hdr = NULL;
+	
 	while (index < bin_dumps) {
 		if (Zone->ZoneType == LARGE) {
-			t_header *HdrFree = Zone->Bins[index];
-			
-			while (HdrFree != NULL && HdrFree->RealSize < MinSlotSizeToBreak)
-				HdrFree = HdrFree->NextFree;
-
-			if (HdrFree != NULL)
-				break;
-
-		} else if (Zone->Bins[index] != NULL)
+			Hdr = get_slot_of_size_in_large_bin(MinSlotSizeToBreak, Zone, index);			
+		} else {
+			Hdr = Zone->Bins[index];
+		}
+		
+		if (Hdr != NULL) {
 			break;
+		}
 
 		index++;
 	}
 
-	t_header *Hdr = NULL;
-
-	if (index < bin_dumps) {
-		Hdr = Zone->Bins[index];
-	} else {
+	if (index >= bin_dumps) {
 		Hdr = Zone->Bins[bin_dumps];
+		
 		while (Hdr != NULL
 			&& Hdr->RealSize < (HEADER_SIZE + MinSlotSizeToBreak)) {
 			
@@ -234,12 +200,7 @@ t_header	*get_breakable_slot(size_t AlignedSize, t_memchunks *Zone) {
 }
 
 t_header	*get_perfect_or_break_slot(size_t AlignedSize, t_memchunks *Zone) {
-	t_header *Hdr = NULL;
-
-	if (Zone->ZoneType == LARGE)
-		Hdr = get_large_good_enough_slot(AlignedSize);
-	else
-		Hdr = get_perfect_slot(AlignedSize, Zone);
+	t_header *Hdr = get_perfect_slot(AlignedSize, Zone);
 
 	if (Hdr != NULL)
 		return Hdr;
@@ -297,54 +258,6 @@ t_header	*get_slot(size_t AlignedSize, t_zonetype ZoneType) {
 	return Hdr;
 }
 
-t_header	*get_large_slot(size_t AlignedSize) {	
-	size_t RequestedSize = AlignedSize + HEADER_SIZE;
-		
-	t_memchunks *MemZone = GET_LARGE_ZONE(); //&MemoryLayout.LargeZone;
-	int MinSlotSize = LARGE_SPACE_MIN;
-	
-	t_header *Hdr = get_free_slot(&MemZone->FreeList, RequestedSize);
-	if (Hdr == NULL) {
-		// allocate new chunk
-		int ChunkSize = LARGE_CHUNK(AlignedSize);
-		
-		if (ChunkSize < LARGE_PREALLOC)
-			ChunkSize = LARGE_PREALLOC;
-
-		Hdr = allocate_and_initialize_chunk(MemZone, ChunkSize);
-		if (Hdr == NULL)
-			return NULL;	
-	
- 		lst_free_add(&MemZone->FreeList, Hdr);
-	}
-
-	if (Hdr->RealSize >= (RequestedSize + MinSlotSize)) {
-		size_t NewSize = Hdr->RealSize - RequestedSize;
-		Hdr->RealSize = NewSize;
-		
-		t_header *PrevHdr = Hdr;
-
-		Hdr = (t_header *)((void *)Hdr + NewSize);
-	
-		Hdr->Size = AlignedSize;
-		Hdr->RealSize = RequestedSize;
-		Hdr->Prev = PrevHdr; 
-		Hdr->Next = PrevHdr->Next;
-
-		PrevHdr->Next = FLAG(Hdr);
-	} else {
-		Hdr->Size = AlignedSize;
-		lst_free_remove(&MemZone->FreeList, Hdr);
-	
-		t_header *PrevHdr = UNFLAG(Hdr->Prev);
-		if (PrevHdr != NULL) {
-			PrevHdr->Next = FLAG(Hdr);
-		}	
-	}
-
-	return Hdr;
-}
-
 void	*malloc_block(size_t size) {
 	size_t AlignedSize = SIZE_ALIGN(size);
 
@@ -368,7 +281,7 @@ void	*malloc_block(size_t size) {
 	if (PrevHdr != NULL) {
 		PrevHdr->Next = FLAG(Hdr);
 	} else {
-		// how to flag block as occupied if it is the first ?
+		// TODO: how to flag block as occupied if it is the first ?
 		// can't just rely on the next one: can be the only one in its chunk
 	}
 
