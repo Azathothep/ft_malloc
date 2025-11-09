@@ -64,6 +64,8 @@ typedef struct	s_memlayout {
 	t_header	*LargeFreeList;
 	int			LargeBinsCount;
 	t_header	*LargeBins[LARGE_BINS_COUNT];
+
+	t_header	*UnsortedBin;
 }		t_memlayout;
 
 extern	t_memlayout MemoryLayout;
@@ -132,5 +134,7 @@ void show_bins(t_memchunks *Zone);
 void scan_memory_integrity();
 
 int *get_large_bin_segments();
+
+void	flush_unsorted_bin();
 
 #endif

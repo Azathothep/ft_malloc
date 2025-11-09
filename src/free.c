@@ -208,7 +208,35 @@ void	coalesce_slots(t_memchunks *Zone) {
 	}
 }
 
-void	free_slot(t_header *Hdr, t_zonetype ZoneType) {
+void	free_slot(t_header *Hdr) {
+ 	size_t BlockSize = Hdr->RealSize - HEADER_SIZE;
+	
+	t_memchunks *Zone = NULL;
+	if (BlockSize > SMALL_ALLOC_MAX) {
+		Zone = GET_LARGE_ZONE();
+	} else if (BlockSize > TINY_ALLOC_MAX) {
+		Zone = GET_SMALL_ZONE();
+	} else {
+		Zone = GET_TINY_ZONE();
+	}
+
+	put_slot_in_bin(Hdr, Zone);
+}
+
+void	flush_unsorted_bin() {
+	t_header *Hdr = MemoryLayout.UnsortedBin;
+
+	while (Hdr != NULL) {
+		t_header *Next = Hdr->NextFree;
+		free_slot(Hdr);
+		Hdr = Next;
+	}
+
+	MemoryLayout.UnsortedBin = NULL;
+}
+
+void	add_to_unsorted_bin(t_header *Hdr) {
+
 	t_header *HdrPrev = UNFLAG(Hdr->Prev);
 	t_header *HdrNext = UNFLAG(Hdr->Next);
 
@@ -218,16 +246,20 @@ void	free_slot(t_header *Hdr, t_zonetype ZoneType) {
 	if (HdrPrev != NULL)
 		HdrPrev->Next = Hdr;
 
-	t_memchunks *Zone = NULL;
-	if (ZoneType == TINY)
-		Zone = GET_TINY_ZONE();
-	else if (ZoneType == SMALL)
-		Zone = GET_SMALL_ZONE();
-	else
-		Zone = GET_LARGE_ZONE();
+	t_header *FirstBinHdr = MemoryLayout.UnsortedBin;
 
-	put_slot_in_bin(Hdr, Zone);
+	Hdr->PrevFree = NULL;
+	Hdr->NextFree = NULL;
+
+	MemoryLayout.UnsortedBin = Hdr;
+
+	if (FirstBinHdr == NULL)
+		return;
+
+	Hdr->NextFree = FirstBinHdr;
+	FirstBinHdr->PrevFree = Hdr;
 }
+
 
 // ----------- FREE ------------ //
 
@@ -236,23 +268,12 @@ void	free(void *Ptr) {
 	//TODO(felix): verify if block need to be freed beforehand !!!	
 
 	t_header *Hdr = GET_HEADER(Ptr);
- 	size_t BlockSize = Hdr->RealSize - HEADER_SIZE;
 
 #ifdef PRINT_FREE
-	PRINT("Freeing address "); PRINT_ADDR(Ptr); PRINT(" (size: "); PRINT_UINT64(BlockSize); PRINT(", Header: "); PRINT_ADDR(GET_HEADER(Ptr)); PRINT(")"); NL();
+	PRINT("Freeing address "); PRINT_ADDR(Ptr); PRINT(", Header: "); PRINT_ADDR(Hdr); NL();
 #endif
 
-	t_zonetype ZoneType;
-
-	if (BlockSize > SMALL_ALLOC_MAX) {
-		ZoneType = LARGE;
-	} else if (BlockSize > TINY_ALLOC_MAX) {
-		ZoneType = SMALL;
-	} else {
-		ZoneType = TINY;
-	}
-
-	free_slot(Hdr, ZoneType);
+	add_to_unsorted_bin(Hdr);
 
 	scan_memory_integrity();
 }

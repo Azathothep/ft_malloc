@@ -11,7 +11,9 @@ t_memlayout MemoryLayout = {
 
 	SMALL, NULL, NULL, SMALL_BINS_COUNT, { },
 
-	LARGE, NULL, NULL, LARGE_BINS_COUNT, { }
+	LARGE, NULL, NULL, LARGE_BINS_COUNT, { },
+
+	NULL
 };
 
 // TODO(felix): change this to support multithreaded programs
@@ -243,10 +245,13 @@ t_header	*get_slot(size_t AlignedSize, t_zonetype ZoneType) {
 
 	t_header *Hdr = get_perfect_or_break_slot(AlignedSize, Zone);
 
+	flush_unsorted_bin();
+
 	if (Hdr != NULL)
 		return Hdr;
 
 	coalesce_slots(Zone);
+
 	Hdr = get_perfect_or_break_slot(AlignedSize, Zone);
 
 	if (Hdr != NULL)
@@ -264,11 +269,34 @@ t_header	*get_slot(size_t AlignedSize, t_zonetype ZoneType) {
 	return Hdr;
 }
 
-void	*malloc_block(size_t size) {
-	size_t AlignedSize = SIZE_ALIGN(size);
+t_header	*find_in_unsorted_bin(size_t AlignedSize) {
+	t_header *Hdr = MemoryLayout.UnsortedBin;
 
-	t_header *Hdr = NULL;
+	size_t RequestedSize = AlignedSize + HEADER_SIZE;
 	
+	while (Hdr != NULL) {
+		if (Hdr->RealSize == RequestedSize)
+		{
+			if (Hdr->PrevFree != NULL)
+				Hdr->PrevFree->NextFree = Hdr->NextFree;
+			else
+				MemoryLayout.UnsortedBin = Hdr->NextFree;
+
+			if (Hdr->NextFree != NULL)
+				Hdr->NextFree->PrevFree = Hdr->PrevFree;
+		
+			return Hdr;
+		}
+
+		Hdr = Hdr->NextFree;
+	}
+
+	return NULL;
+}
+
+t_header	*get_slot_from_zone(size_t AlignedSize) {
+	t_header *Hdr = NULL;
+
 	if (AlignedSize <= TINY_ALLOC_MAX) {
 		
 		if (AlignedSize < MIN_TINY_ALLOC)
@@ -280,7 +308,24 @@ void	*malloc_block(size_t size) {
 	} else {
 		Hdr = get_slot(AlignedSize, LARGE);
 	}
-	
+
+	if (Hdr == NULL)
+		return NULL;
+
+	return Hdr;
+}
+
+void	*malloc_block(size_t size) {
+	size_t AlignedSize = SIZE_ALIGN(size);
+
+	t_header *Hdr = find_in_unsorted_bin(AlignedSize);
+
+	if (Hdr == NULL)
+		Hdr = get_slot_from_zone(AlignedSize);
+
+	if (Hdr == NULL)
+		return NULL;
+
 	t_header *NextHdr = UNFLAG(Hdr->Next);		
 	t_header *PrevHdr = UNFLAG(Hdr->Prev);
 
@@ -309,9 +354,9 @@ void	*malloc(size_t size) {
 	if (size == 0)
 		return NULL;
 
-	void *Allocation = malloc_block(size);
+	void *AllocatedPtr = malloc_block(size);
 	
 	scan_memory_integrity();
 	
-	return Allocation;
+	return AllocatedPtr;
 }
