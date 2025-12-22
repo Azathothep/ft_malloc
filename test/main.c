@@ -1,6 +1,6 @@
 #include <stddef.h>
 #include <stdio.h>
-#include "ft_malloc.h"
+//#include "ft_malloc.h"
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -147,8 +147,8 @@ int main(int argc, char** argv)
 
 	unsigned int seed = time(NULL);
 	int 	n = 1;
-	int		maxAlloc = 100;
-	size_t 	maxAllocSize = 2048;
+	int		maxAlloc = 1000; //100;
+	size_t 	maxAllocSize = 20480;
 
 	if (argc > 1)
 		seed = atoi(argv[1]);
@@ -187,7 +187,7 @@ int main(int argc, char** argv)
 		i++;
 	}
 
-	show_alloc_mem();
+//	show_alloc_mem();
 
 //	float freeAverageTime = freeTotalTime / i;
 

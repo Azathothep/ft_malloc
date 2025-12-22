@@ -185,6 +185,17 @@ void	scan_zone_integrity(t_memzone *Zone) {
 				}
 			}			
 
+			if (Hdr->State != INUSE && Hdr->State != FREE && Hdr->State != UNSORTED_FREE) {
+				scan_error(Hdr, Prev, "HEADER FREE FLAG OVERWRITTEN");
+				return;
+			}
+
+			if (Hdr->State == FREE && ((uint64_t)Hdr->PrevFree == 0xffffffffffffffff || (uint64_t)Hdr->NextFree == 0xffffffffffffffff))
+			{
+				scan_error(Hdr, Prev, "HEADER MARKED FREE BUT INCONSISTENT HEADERS");
+				return;
+			}
+
 			t_header *NextCalculated = (t_header *)((void *)Hdr + Hdr->RealSize);
 			if (Next != NULL && NextCalculated != Next) {
 				scan_error(Hdr, Prev, "HOLE OR OVERLAPPING SLOT");

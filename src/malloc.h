@@ -11,6 +11,12 @@ typedef struct 	s_memchunk {
 	uint64_t Padding;
 }				t_memchunk;
 
+typedef enum	s_usage {
+	FREE,
+	UNSORTED_FREE,
+	INUSE
+}				t_usage;
+
 # define PAGE_SIZE			getpagesize()
 # define CHUNK_ALIGN(c)		(((c) + (PAGE_SIZE-1)) & ~(PAGE_SIZE-1)) 	
 
@@ -29,7 +35,7 @@ typedef struct 	s_memchunk {
 typedef struct 	s_header {
 	struct s_header	*Prev;
 	struct s_header *Next;
-	uint64_t		Free;
+	t_usage			State;
 	size_t			RealSize;
 
 	// Only used when block is freed
@@ -50,13 +56,20 @@ typedef enum e_zonetype {
 	LARGE
 }			t_zonetype;
 
+typedef	struct	s_memstatus {
+	size_t		TotalMappedMemSize;
+	size_t		TotalFreedMemSize;
+	size_t		FreedMemSinceLastCoalescion;
+}				t_memstatus;
+
 typedef struct	s_memzone {
 	t_zonetype	ZoneType;
 	t_memchunk	*FirstChunk;
 	t_header	*FreeList;
+	t_memstatus	MemStatus;
 	int			BinsCount;
 	t_header	*Bins[];
-}		t_memzone;
+	}		t_memzone;
 
 # define MIN_ALLOC			16
 # define MIN_TINY_ALLOC		MIN_ALLOC
@@ -87,22 +100,39 @@ typedef struct	s_memzone {
 # define GET_SMALL_ZONE()	((t_memzone*)((void *)&MemoryLayout + TINY_ZONE_SIZE))
 # define GET_LARGE_ZONE()	((t_memzone*)((void *)&MemoryLayout + TINY_ZONE_SIZE + SMALL_ZONE_SIZE))
 
+# define MIN_MEM_BEFORE_UNMAP	(PAGE_SIZE * 50)
+
+# define MIN_MEM_TO_KEEP_TINY	(TINY_CHUNK * 5)
+# define MIN_FREED_MEM_BEFORE_COALESCE_TINY		(TINY_CHUNK * 5)
+# define MIN_CHUNK_MEM_BEFORE_UNMAP_TINY		(TINY_CHUNK * 5)
+
+# define MIN_MEM_TO_KEEP_SMALL	(SMALL_CHUNK * 5)
+# define MIN_FREED_MEM_BEFORE_COALESCE_SMALL	(SMALL_CHUNK * 5)
+# define MIN_CHUNK_MEM_BEFORE_UNMAP_SMALL	(SMALL_CHUNK * 5)
+
+# define MIN_MEM_TO_KEEP_LARGE	(LARGE_PREALLOC * 2)
+# define MIN_FREED_MEM_BEFORE_COALESCE_LARGE	(LARGE_PREALLOC)
+# define MIN_CHUNK_MEM_BEFORE_UNMAP_LARGE	(LARGE_PREALLOC)
+
 typedef struct	s_memlayout {
 	t_zonetype	TinyZoneType;
 	t_memchunk	*TinyFirstChunk;
 	t_header	*TinyFreeList;
+	t_memstatus	TinyMemStatus;
 	int			TinyBinsCount;
 	t_header	*TinyBins[TINY_BINS_COUNT];	
 		
 	t_zonetype	SmallZoneType;
 	t_memchunk	*SmallFirstChunk;
 	t_header	*SmallFreeList;
+	t_memstatus	SmallMemStatus;
 	int			SmallBinsCount;	
 	t_header	*SmallBins[SMALL_BINS_COUNT];
 
 	t_zonetype	LargeZoneType;
 	t_memchunk	*LargeFirstChunk;
 	t_header	*LargeFreeList;
+	t_memstatus	LargeMemStatus;
 	int			LargeBinsCount;
 	t_header	*LargeBins[LARGE_BINS_COUNT];
 
@@ -124,5 +154,7 @@ void scan_memory_integrity();
 int *get_large_bin_segments();
 
 void	flush_unsorted_bin();
+
+void	show_bins(t_memzone *Zone);
 
 #endif

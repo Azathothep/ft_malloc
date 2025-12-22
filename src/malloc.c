@@ -8,11 +8,11 @@
 #define SCAN_MEMORY_MALLOC
 
 t_memlayout MemoryLayout = {
-	TINY, NULL, NULL, TINY_BINS_COUNT, { },
+	TINY, NULL, NULL, { }, TINY_BINS_COUNT, { },
 
-	SMALL, NULL, NULL, SMALL_BINS_COUNT, { },
+	SMALL, NULL, NULL, { }, SMALL_BINS_COUNT, { },
 
-	LARGE, NULL, NULL, LARGE_BINS_COUNT, { },
+	LARGE, NULL, NULL, { }, LARGE_BINS_COUNT, { },
 
 	NULL
 };
@@ -63,7 +63,8 @@ void	*alloc_chunk(t_memzone *MemZone, size_t ChunkSize) {
 
 	LastChunk->Next = NewChunk;
 	NewChunk->Prev = LastChunk;
-	return NewChunk;	
+
+	return NewChunk;
 }
 
 t_header	*allocate_and_initialize_chunk(t_memzone *MemZone, size_t ChunkSize) {
@@ -76,12 +77,15 @@ t_header	*allocate_and_initialize_chunk(t_memzone *MemZone, size_t ChunkSize) {
 	t_header *Hdr = (t_header *)ChunkStartingAddr;
 	Hdr->Prev = NULL;
 	Hdr->Next = NULL;
-	Hdr->Free = 1;
+	Hdr->State = FREE;
 	Hdr->RealSize = CHUNK_USABLE_SIZE(ChunkSize);
 	
 	Hdr->PrevFree = NULL;
 	Hdr->NextFree = NULL;
-	
+
+	MemZone->MemStatus.TotalMappedMemSize += Hdr->RealSize;
+	MemZone->MemStatus.TotalFreedMemSize += Hdr->RealSize;
+
 	return Hdr;
 }
 
@@ -224,30 +228,16 @@ t_header	*get_perfect_or_break_slot(size_t AlignedSize, t_memzone *Zone) {
 
 	t_header *ToBreak = Hdr;
 	Hdr = break_slot(ToBreak, AlignedSize);
+	Hdr->State = FREE;
 	put_slot_in_bin(ToBreak, Zone);
 	return Hdr;
 }
 
-t_header	*get_slot(size_t AlignedSize, t_zonetype ZoneType) {
-	t_memzone *Zone = NULL;
-	size_t ChunkSize = 0;
-
-	if (ZoneType == TINY) {
-		Zone = GET_TINY_ZONE();
-		ChunkSize = TINY_CHUNK;
-	}
-	else if (ZoneType == SMALL) {
-		Zone = GET_SMALL_ZONE();
-		ChunkSize = SMALL_CHUNK;
-	} else {
-		Zone = GET_LARGE_ZONE();
-		ChunkSize = LARGE_CHUNK(AlignedSize);
-	
-		if (ChunkSize < (size_t)LARGE_PREALLOC)
-			ChunkSize = LARGE_PREALLOC;
-	}
-
+t_header	*get_slot(size_t AlignedSize, t_memzone *Zone) {	
 	t_header *Hdr = get_perfect_or_break_slot(AlignedSize, Zone);
+
+	if (Hdr != NULL)
+		Hdr->State = INUSE;
 
 	flush_unsorted_bin();
 
@@ -260,6 +250,20 @@ t_header	*get_slot(size_t AlignedSize, t_zonetype ZoneType) {
 
 	if (Hdr != NULL)
 		return Hdr;
+
+	size_t ChunkSize = 0;
+
+	if (Zone->ZoneType == TINY) {
+		ChunkSize = TINY_CHUNK;
+	}
+	else if (Zone->ZoneType == SMALL) {
+		ChunkSize = SMALL_CHUNK;
+	} else {
+		ChunkSize = LARGE_CHUNK(AlignedSize);
+	
+		if (ChunkSize < (size_t)LARGE_PREALLOC)
+			ChunkSize = LARGE_PREALLOC;
+	}
 
 	Hdr = allocate_and_initialize_chunk(Zone, ChunkSize);
 	
@@ -288,7 +292,7 @@ t_header	*find_in_unsorted_bin(size_t AlignedSize) {
 
 			if (Hdr->NextFree != NULL)
 				Hdr->NextFree->PrevFree = Hdr->PrevFree;
-		
+	
 			return Hdr;
 		}
 
@@ -299,22 +303,26 @@ t_header	*find_in_unsorted_bin(size_t AlignedSize) {
 }
 
 t_header	*get_slot_from_zone(size_t AlignedSize) {
-	t_header *Hdr = NULL;
+	t_memzone *Zone = NULL;
 
 	if (AlignedSize <= TINY_ALLOC_MAX) {
 		
 		if (AlignedSize < MIN_TINY_ALLOC)
 			AlignedSize = MIN_TINY_ALLOC;
 
-		Hdr = get_slot(AlignedSize, TINY);		
+		Zone = GET_TINY_ZONE();
 	} else if (AlignedSize <= SMALL_ALLOC_MAX) {
-		Hdr = get_slot(AlignedSize, SMALL);
+		Zone = GET_SMALL_ZONE();
 	} else {
-		Hdr = get_slot(AlignedSize, LARGE);
+		Zone = GET_LARGE_ZONE();
 	}
+
+	t_header *Hdr = get_slot(AlignedSize, Zone);
 
 	if (Hdr == NULL)
 		return NULL;
+
+	Zone->MemStatus.TotalFreedMemSize -= Hdr->RealSize;
 
 	return Hdr;
 }
@@ -330,7 +338,7 @@ void	*malloc_block(size_t size) {
 	if (Hdr == NULL)
 		return NULL;
 
-	Hdr->Free = 0;
+	Hdr->State = INUSE;
 
 	void *AllocatedPtr = GET_SLOT(Hdr);
 

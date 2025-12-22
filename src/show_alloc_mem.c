@@ -3,6 +3,7 @@
 
 #define ANSI_COLOR_RED		"\x1b[31m"
 #define	ANSI_COLOR_GREEN	"\x1b[32m"
+#define ANSI_COLOR_BLUE		"\x1b[34m"
 #define ANSI_COLOR_RESET	"\x1b[0m"
 
 //TODO(felix): add chunk subdivision in zones
@@ -10,14 +11,16 @@
 void	print_block(t_header *Hdr) {
 	char *color = NULL;
 	
-	if (Hdr->Free)
+	if (Hdr->State == FREE)
 		color = ANSI_COLOR_GREEN;
+	else if (Hdr->State == UNSORTED_FREE)
+		color = ANSI_COLOR_BLUE;
 	else
 		color = ANSI_COLOR_RED;
 	
 	PRINT(color); PRINT_ADDR(Hdr); PRINT(": ");
 
-	if (!Hdr->Free) {
+	if (Hdr->State == INUSE) {
 		PRINT_UINT64(Hdr->RealSize - HEADER_SIZE);
 		PRINT(" ");
 	}
