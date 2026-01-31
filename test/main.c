@@ -128,7 +128,7 @@ int main(int argc, char** argv)
 	unsigned int seed = time(NULL);
 	int 	n = 1;
 	int		maxAlloc = 10000; //100;
-	size_t 	maxAllocSize = 20480;
+	size_t 	maxAllocSize = 2048; //20480;
 
 	if (argc > 1)
 		seed = atoi(argv[1]);

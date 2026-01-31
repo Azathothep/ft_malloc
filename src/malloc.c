@@ -5,29 +5,29 @@
 #include "malloc.h"
 
 t_memlayout MemoryLayout = {
-	TINY, NULL, NULL, { },  TINY_BINS_COUNT, { },
+	TINY, NULL, { },  TINY_BINS_COUNT, { },
 
-	SMALL, NULL, NULL, { }, SMALL_BINS_COUNT, { },
+	SMALL, NULL, { }, SMALL_BINS_COUNT, { },
 
-	LARGE, NULL, NULL, { }, LARGE_BINS_COUNT, { },
+	LARGE, NULL, { }, LARGE_BINS_COUNT, { },
 
 	NULL
 };
 
 void	*map_memory(int ChunkSize) {
-	void *ptrToMappedMemory = mmap(NULL,
+	void *PtrToMappedMemory = mmap(NULL,
 					ChunkSize,
 					PROT_READ | PROT_WRITE,
 					MAP_ANON | MAP_ANONYMOUS | MAP_PRIVATE, 
 					-1, //fd
 					0); //offset_t
 
-	if (ptrToMappedMemory == MAP_FAILED) {
+	if (PtrToMappedMemory == MAP_FAILED) {
 		PRINT_ERROR("Failed to map memory, errno = "); PRINT_UINT64(errno); NL();
 		return NULL;
 	}
 
-	return ptrToMappedMemory;
+	return PtrToMappedMemory;
 }
 
 void	*alloc_chunk(t_memzone *Zone, size_t ChunkSize) {

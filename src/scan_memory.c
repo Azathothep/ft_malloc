@@ -1,15 +1,15 @@
 #include "malloc.h"
 #include "utils.h"
 #include <stdlib.h>
-#include "../ft_malloc.h"
 
 #define ANSI_COLOR_RED		"\x1b[31m"
 #define	ANSI_COLOR_GREEN	"\x1b[32m"
 #define ANSI_COLOR_RESET	"\x1b[0m"
 
+#define MAX_MEM_TO_PRINT	90
 #define LINE_SIZE	2
 
-void	show_bins(t_memzone *Zone) {
+void	print_bins(t_memzone *Zone) {
 	PRINT("BINS\n");
 
 	t_header **Bins = Zone->Bins;
@@ -35,31 +35,31 @@ void	show_bins(t_memzone *Zone) {
 	}
 }
 
-void	scan_hexdump_single(void *P) {
-	void *mem = *((void **)P);
-	PRINT_ADDR(mem);
+void	print_hexdump(void *P) {
+	void *Mem = *((void **)P);
+	PRINT_ADDR(Mem);
 }
 
-void	scan_hexdump(t_header *Hdr) {
+void	print_hexdump_slot(t_header *Hdr) {
 	if (Hdr == NULL) {
 		PRINT("["); PRINT_ADDR(Hdr); PRINT("]: ");
 		return;
 	}
 
-	size_t byteSize = Hdr->SlotSize;
-	if (byteSize > 90)
-		byteSize = 90;
+	size_t SlotSize = Hdr->SlotSize;
+	if (SlotSize > MAX_MEM_TO_PRINT)
+		SlotSize = MAX_MEM_TO_PRINT;
 
-	int slotSize = byteSize / 8;
-	int lines = slotSize / LINE_SIZE;
+	int MemCount = SlotSize / 8;
+	int LinesCount = MemCount / LINE_SIZE;
 	void *P = (void *)Hdr;
 
 	int i = 0;
-	while (i < lines) {
+	while (i < LinesCount) {
 		PRINT("["); PRINT_ADDR(P); PRINT("]: ");
 		int j = 0;
 		while (j < LINE_SIZE) {
-			scan_hexdump_single(P);	
+			print_hexdump(P);	
 			P += 8;
 			PRINT("  ");
 			j++;
@@ -69,62 +69,62 @@ void	scan_hexdump(t_header *Hdr) {
 		i++;
 	}
 
-	int remaining = slotSize - (lines * LINE_SIZE);
-	if (remaining > 0) {
+	int Remaining = MemCount - (LinesCount * LINE_SIZE);
+	if (Remaining > 0) {
 		PRINT("["); PRINT_ADDR(P); PRINT("]: ");
 	}
 
 	i = 0;
-	while (i < remaining) {
-		scan_hexdump_single(P);
+	while (i < Remaining) {
+		print_hexdump(P);
 		PRINT(" ");
 		P += 8;
 		i++;
 	}
 
-	if (byteSize > 90)
+	if (Hdr->SlotSize > MAX_MEM_TO_PRINT)
 		PRINT("...");
 
 	NL();
 }
 
-void	scan_error(t_header *Hdr, t_header *Prev, char *errmsg) {
-	PRINT(ANSI_COLOR_RED); PRINT("["); PRINT_ADDR(Hdr); PRINT("]: CORRUPTED MEMORY - "); PRINT(errmsg); PRINT(ANSI_COLOR_RESET); NL();
+void	scan_error(t_header *Hdr, t_header *Prev, char *Errmsg) {
+	PRINT(ANSI_COLOR_RED); PRINT("["); PRINT_ADDR(Hdr); PRINT("]: CORRUPTED MEMORY - "); PRINT(Errmsg); PRINT(ANSI_COLOR_RESET); NL();
 
 	PRINT("\n----------------- HEXDUMP -----------------\n");
 	PRINT("\nPrevious header\n");
-	scan_hexdump(Prev);
+	print_hexdump_slot(Prev);
 	PRINT("\nCorrupted header\n");
-	scan_hexdump(Hdr);
+	print_hexdump_slot(Hdr);
 	PRINT("\nNext header\n");
-	scan_hexdump(Hdr->Next);
+	print_hexdump_slot(Hdr->Next);
 
 	exit(1);
 }
 
-void	bin_error(t_header *Hdr, char *errmsg, t_memzone *Zone) {
-	PRINT(ANSI_COLOR_RED); PRINT("["); PRINT_ADDR(Hdr); PRINT("]: CORRUPTED BINS - "); PRINT(errmsg); PRINT(ANSI_COLOR_RESET); NL();
+void	bin_error(t_header *Hdr, char *Errmsg, t_memzone *Zone) {
+	PRINT(ANSI_COLOR_RED); PRINT("["); PRINT_ADDR(Hdr); PRINT("]: CORRUPTED BINS - "); PRINT(Errmsg); PRINT(ANSI_COLOR_RESET); NL();
 
 	PRINT("\n----------------- HEXDUMP -----------------\n");
 	PRINT("\nPrev free header\n");
-	scan_hexdump(Hdr->PrevFree);
+	print_hexdump_slot(Hdr->PrevFree);
 	PRINT("\nCorrupted header\n");
-	scan_hexdump(Hdr);
+	print_hexdump_slot(Hdr);
 	PRINT("\nNext free header\n");
-	scan_hexdump(Hdr->NextFree);
+	print_hexdump_slot(Hdr->NextFree);
 
-	show_bins(Zone);
+	print_bins(Zone);
 
 	exit(1);
 }
 
-void	search_for_double(t_memzone *Zone, t_header *to_check, int CurrentBin) {
+void	search_for_double_header(t_memzone *Zone, t_header *Hdr, int CurrentBin) {
 	t_header **Bins = Zone->Bins;
-	t_header *NextFree = to_check->NextFree;
+	t_header *NextFree = Hdr->NextFree;
 	while (CurrentBin < Zone->BinsCount) {
 		while (NextFree != NULL) {
-			if (to_check == NextFree) {
-				bin_error(to_check, "Header found twice !", Zone);
+			if (Hdr == NextFree) {
+				bin_error(Hdr, "Header found twice!", Zone);
 			}
 
 			NextFree = NextFree->NextFree;
@@ -137,11 +137,11 @@ void	search_for_double(t_memzone *Zone, t_header *to_check, int CurrentBin) {
 }
 
 void	scan_free_integrity(t_memzone *Zone) {
-	int currentBin = 0;
+	int BinIndex = 0;
 	t_header **Bins = Zone->Bins;
 	
-	while (currentBin < Zone->BinsCount) {
-		t_header *Hdr = Bins[currentBin];
+	while (BinIndex < Zone->BinsCount) {
+		t_header *Hdr = Bins[BinIndex];
 		while (Hdr != NULL) {
 			if (Hdr->PrevFree != NULL && Hdr->PrevFree->NextFree != Hdr)
 				bin_error(Hdr, "Inconsistent free headers", Zone);
@@ -149,10 +149,11 @@ void	scan_free_integrity(t_memzone *Zone) {
 			if (Hdr->NextFree != NULL && Hdr->NextFree->PrevFree != Hdr)
 				bin_error(Hdr, "Inconsistent free headers", Zone);
 
-			search_for_double(Zone, Hdr, currentBin);
+			search_for_double_header(Zone, Hdr, BinIndex);
 			Hdr = Hdr->NextFree;
 		}
-		currentBin++;
+
+		BinIndex++;
 	}
 }
 
@@ -206,7 +207,7 @@ void	scan_zone_integrity(t_memzone *Zone) {
 			Hdr = Hdr->Next;
 		}
 		
-		Chunk = Chunk->Next; //GET_NEXT_CHUNK(Chunk);
+		Chunk = Chunk->Next;
 	}
 }
 

@@ -5,11 +5,10 @@ endif
 #-------------- SOURCES --------------#
 
 SRC =		malloc.c \
-		free.c \
-		utils.c \
-		show_free_mem.c \
-		show_alloc_mem.c \
-		scan_memory.c \
+			free.c \
+			utils.c \
+			print_mem.c \
+			scan_memory.c \
 
 SRC_DIR =	src
 
@@ -30,7 +29,6 @@ FLAGS =		-Wall -Wextra -Werror -g
 INCLUDES =	${SRC_DIR}/malloc.h \
 		${SRC_DIR}/utils.h \
 		ft_malloc.h \
-		#${LIBFT_INCLUDE}
 
 LIBFT_NAME =	libft.a
 
@@ -42,28 +40,23 @@ LIBFT =		${LIBFT_DIR}/${LIBFT_NAME}
 
 #--------------- RULES --------------#
 
-all:		makelibft ${NAME}
+all:		${NAME}
 
 ${OBJ_DIR}/%.o:	${SRC_DIR}/%.c ${INCLUDES} | ${OBJ_DIR}
-		${CC} ${FLAGS} -fPIC -c $< -o $@ -I. #-I${LIBFT_DIR}
+		${CC} ${FLAGS} -fPIC -c $< -o $@ -I.
 
-${NAME}:	${OBJ} ${INCLUDES} #${LIBFT} 
-		${CC} ${FLAGS} ${OBJ} -shared -o ${LIBHOST} # -lft -L${LIBFT_DIR}
+${NAME}:	${OBJ} ${INCLUDES}
+		${CC} ${FLAGS} ${OBJ} -shared -o ${LIBHOST}
 		ln -sf ${LIBHOST} ${NAME}
 
 ${OBJ_DIR}:	
 		@mkdir -p ${OBJ_DIR}
 
-makelibft:	
-		#${MAKE} -C ${LIBFT_DIR}
-
 clean:		
 		rm -rf ${OBJ_DIR}
-		#${MAKE} -C ${LIBFT_DIR} clean
 
 fclean:		clean
 		rm -f ${NAME} ${LIBHOST}
-		#${MAKE} -C ${LIBFT_DIR} fclean
 
 re:		fclean all
 

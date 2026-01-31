@@ -65,7 +65,6 @@ typedef	struct	s_memstatus {
 typedef struct	s_memzone {
 	t_zonetype	ZoneType;
 	t_memchunk	*FirstChunk;
-	t_header	*FreeList;
 	t_memstatus	MemStatus;
 	int			BinsCount;
 	t_header	*Bins[];
@@ -117,21 +116,18 @@ typedef struct	s_memzone {
 typedef struct	s_memlayout {
 	t_zonetype	TinyZoneType;
 	t_memchunk	*TinyFirstChunk;
-	t_header	*TinyFreeList;
 	t_memstatus	TinyMemStatus;
 	int			TinyBinsCount;
 	t_header	*TinyBins[TINY_BINS_COUNT];	
 		
 	t_zonetype	SmallZoneType;
 	t_memchunk	*SmallFirstChunk;
-	t_header	*SmallFreeList;
 	t_memstatus	SmallMemStatus;
 	int			SmallBinsCount;	
 	t_header	*SmallBins[SMALL_BINS_COUNT];
 
 	t_zonetype	LargeZoneType;
 	t_memchunk	*LargeFirstChunk;
-	t_header	*LargeFreeList;
 	t_memstatus	LargeMemStatus;
 	int			LargeBinsCount;
 	t_header	*LargeBins[LARGE_BINS_COUNT];

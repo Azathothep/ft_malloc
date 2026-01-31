@@ -6,17 +6,17 @@
 #define ANSI_COLOR_BLUE		"\x1b[34m"
 #define ANSI_COLOR_RESET	"\x1b[0m"
 
-void	print_block(t_header *Hdr) {
-	char *color = NULL;
+void	print_slot(t_header *Hdr) {
+	char *Color = NULL;
 	
 	if (Hdr->State == FREE)
-		color = ANSI_COLOR_GREEN;
+		Color = ANSI_COLOR_GREEN;
 	else if (Hdr->State == UNSORTED_FREE)
-		color = ANSI_COLOR_BLUE;
+		Color = ANSI_COLOR_BLUE;
 	else
-		color = ANSI_COLOR_RED;
+		Color = ANSI_COLOR_RED;
 	
-	PRINT(color); PRINT_ADDR(Hdr); PRINT(": ");
+	PRINT(Color); PRINT_ADDR(Hdr); PRINT(": ");
 
 	if (Hdr->State == INUSE) {
 		PRINT_UINT64(Hdr->SlotSize - HEADER_SIZE);
@@ -27,7 +27,7 @@ void	print_block(t_header *Hdr) {
 	PRINT(ANSI_COLOR_RESET); NL();
 }
 
-void	show_alloc_zone(t_memzone *Zone) {
+void	print_zone(t_memzone *Zone) {
 	t_memchunk *Chunk = Zone->FirstChunk;
 
 	while (Chunk != NULL) {
@@ -35,16 +35,16 @@ void	show_alloc_zone(t_memzone *Zone) {
 
 		t_header *Hdr = CHUNK_STARTING_ADDR(Chunk);
 	
-		print_block(Hdr);
+		print_slot(Hdr);
 		
 		Hdr = Hdr->Next;
 
 		while (Hdr != NULL) {
-			print_block(Hdr);
+			print_slot(Hdr);
 			t_header *Prev = Hdr;
 			Hdr = Hdr->Next;
 			if (Hdr != NULL && (uint64_t)Hdr < (uint64_t)Prev) {
-				PRINT("CIRCULAR HEADER !!!\n");
+				PRINT("CIRCULAR HEADER!!!\n");
 				break;
 			}
 		}
@@ -53,22 +53,22 @@ void	show_alloc_zone(t_memzone *Zone) {
 	}
 }
 
-void	show_alloc_mem() {
+void	print_mem() {
 	PRINT("\n---- full mem ----\n");
 
 	t_memzone *Zone = GET_TINY_ZONE();
 	PRINT("TINY ZONE\n");
-	show_alloc_zone(Zone);
+	print_zone(Zone);
 	NL();
 
 	Zone = GET_SMALL_ZONE();
 	PRINT("SMALL ZONE\n");
-	show_alloc_zone(Zone);
+	print_zone(Zone);
 	NL();
 
 	Zone = GET_LARGE_ZONE();
 	PRINT("LARGE ZONE\n");
-	show_alloc_zone(Zone);
+	print_zone(Zone);
 	NL();
 
 	PRINT("------------------\n");
