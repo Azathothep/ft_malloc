@@ -10,7 +10,7 @@ void	show_free_zone(t_memzone *Zone) {
 	while (lst) {
 		PRINT_ADDR(lst); PRINT(": ");
 		//PRINT_UINT64(GET_FREE_SIZE(lst));
-		PRINT_UINT64(lst->RealSize);
+		PRINT_UINT64(lst->SlotSize);
 		PRINT(" bytes\n");
 		lst = lst->Next;
 	}

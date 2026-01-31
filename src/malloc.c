@@ -72,13 +72,13 @@ t_header	*allocate_and_initialize_chunk(t_memzone *Zone, size_t ChunkSize) {
 	Hdr->Prev = NULL;
 	Hdr->Next = NULL;
 	Hdr->State = FREE;
-	Hdr->RealSize = CHUNK_USABLE_SIZE(ChunkSize);
+	Hdr->SlotSize = CHUNK_USABLE_SIZE(ChunkSize);
 	
 	Hdr->PrevFree = NULL;
 	Hdr->NextFree = NULL;
 
-	Zone->MemStatus.TotalMappedMemSize += Hdr->RealSize;
-	Zone->MemStatus.TotalFreedMemSize += Hdr->RealSize;
+	Zone->MemStatus.TotalMappedMemSize += Hdr->SlotSize;
+	Zone->MemStatus.TotalFreedMemSize += Hdr->SlotSize;
 
 	return Hdr;
 }
@@ -86,15 +86,15 @@ t_header	*allocate_and_initialize_chunk(t_memzone *Zone, size_t ChunkSize) {
 // Break the provided slot in two parts, the last one being of the required size
 t_header	*break_slot(t_header *Hdr, size_t RequestedSize) {
 	int RequiredSlotSize = RequestedSize + HEADER_SIZE;
-	size_t LeftoverSize = Hdr->RealSize - RequiredSlotSize;
-	Hdr->RealSize = LeftoverSize;
+	size_t LeftoverSize = Hdr->SlotSize - RequiredSlotSize;
+	Hdr->SlotSize = LeftoverSize;
 		
 	t_header *PrevHdr = Hdr;
 	t_header *NextHdr = Hdr->Next; 
 
 	Hdr = (t_header *)((void *)Hdr + LeftoverSize);
 
-	Hdr->RealSize = RequiredSlotSize;
+	Hdr->SlotSize = RequiredSlotSize;
 
 	Hdr->Prev = PrevHdr;
 	Hdr->Next = PrevHdr->Next;
@@ -111,12 +111,12 @@ t_header *get_slot_of_size_in_large_bin(size_t RequestedSize, t_memzone *Zone, i
 	size_t RequiredSlotSize = RequestedSize + HEADER_SIZE;
 
 	t_header *Hdr = Zone->Bins[BinIndex];
-	if (Hdr == NULL || Hdr->RealSize < RequiredSlotSize) // Large bins are sorted from biggest to smalles. If first one is already too small, the rest won't do.
+	if (Hdr == NULL || Hdr->SlotSize < RequiredSlotSize) // Large bins are sorted from biggest to smalles. If first one is already too small, the rest won't do.
 		return NULL;
 
 	while (Hdr != NULL) {	// If looping, it means Hdr is larger or equal too the RequestSize
 			if (Hdr->NextFree == NULL	// If is last one
-				|| Hdr->NextFree->RealSize < RequiredSlotSize) 	// Or next one is too small
+				|| Hdr->NextFree->SlotSize < RequiredSlotSize) 	// Or next one is too small
 			break;
 
 		Hdr = Hdr->NextFree;
@@ -196,7 +196,7 @@ t_header	*get_breakable_slot(size_t RequestedSize, t_memzone *Zone) {
 		Hdr = Zone->Bins[ZoneBinDumpIndex];
 		
 		while (Hdr != NULL
-			&& Hdr->RealSize < (HEADER_SIZE + MinSlotSizeToBreak)) {
+			&& Hdr->SlotSize < (HEADER_SIZE + MinSlotSizeToBreak)) {
 			
 			Hdr = Hdr->NextFree;
 		}
@@ -298,7 +298,7 @@ t_header	*get_zone_slot(size_t RequestedSize) {
 	if (Hdr == NULL)
 		return NULL;
 
-	Zone->MemStatus.TotalFreedMemSize -= Hdr->RealSize;
+	Zone->MemStatus.TotalFreedMemSize -= Hdr->SlotSize;
 
 	return Hdr;
 }
@@ -310,7 +310,7 @@ t_header	*find_in_unsorted_bin(size_t RequestedSize) {
 	
 	while (Hdr != NULL) {
 		
-		if (Hdr->RealSize != RequiredSlotSize) {
+		if (Hdr->SlotSize != RequiredSlotSize) {
 			Hdr = Hdr->NextFree;
 			continue;
 		}

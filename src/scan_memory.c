@@ -46,7 +46,7 @@ void	scan_hexdump(t_header *Hdr) {
 		return;
 	}
 
-	size_t byteSize = Hdr->RealSize;
+	size_t byteSize = Hdr->SlotSize;
 	if (byteSize > 90)
 		byteSize = 90;
 
@@ -191,7 +191,7 @@ void	scan_zone_integrity(t_memzone *Zone) {
 				return;
 			}
 
-			t_header *NextCalculated = (t_header *)((void *)Hdr + Hdr->RealSize);
+			t_header *NextCalculated = (t_header *)((void *)Hdr + Hdr->SlotSize);
 			if (Next != NULL && NextCalculated != Next) {
 				scan_error(Hdr, Prev, "HOLE OR OVERLAPPING SLOT");
 				return;

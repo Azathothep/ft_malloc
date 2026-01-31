@@ -36,7 +36,7 @@ typedef struct 	s_header {
 	struct s_header	*Prev;
 	struct s_header *Next;
 	t_usage			State;
-	size_t			RealSize;
+	size_t			SlotSize;
 
 	// Only used when block is freed
 	struct s_header *PrevFree;

@@ -19,11 +19,11 @@ void	print_block(t_header *Hdr) {
 	PRINT(color); PRINT_ADDR(Hdr); PRINT(": ");
 
 	if (Hdr->State == INUSE) {
-		PRINT_UINT64(Hdr->RealSize - HEADER_SIZE);
+		PRINT_UINT64(Hdr->SlotSize - HEADER_SIZE);
 		PRINT(" ");
 	}
 	
-	PRINT("["); PRINT_UINT64(Hdr->RealSize); PRINT("] ");
+	PRINT("["); PRINT_UINT64(Hdr->SlotSize); PRINT("] ");
 	PRINT(ANSI_COLOR_RESET); NL();
 }
 
