@@ -13,7 +13,7 @@
 int get_large_bin_index(size_t AlignedSize) {
 	// Getting large bin index is a bit complicated, because these bins are not spaced regularly.
 	// Large bins are divided in segment. Every bin in the same segment is regularly spaced.
-	// We must first find the associated segment, then get the bin index inside that segment.
+	// We must first find the associated segment, then get the bin offset inside that segment.
 
 	// This holds the max size of each segment
 	int max_segment_sizes[LARGE_BINS_SEGMENTS_COUNT] = LARGE_BINS_SEGMENTS;
@@ -60,21 +60,21 @@ int get_large_bin_index(size_t AlignedSize) {
 	return result;
 }
 
-int get_bin_index(size_t AlignedSize, t_zonetype ZoneType) {
+int get_bin_index(size_t ContainedSize, t_zonetype ZoneType) {
 	int result = 0;
 
 	if (ZoneType == TINY) {
-		if (AlignedSize > TINY_ALLOC_MAX)
+		if (ContainedSize > TINY_ALLOC_MAX)
 			result = TINY_BINS_DUMP;
 		else
-			result = (AlignedSize / ALIGNMENT) - 1;
+			result = (ContainedSize / ALIGNMENT) - 1;
 	} else if (ZoneType == SMALL) {
-		if (AlignedSize > SMALL_ALLOC_MAX)
+		if (ContainedSize > SMALL_ALLOC_MAX)
 			result = SMALL_BINS_DUMP;
 		else
-			result = ((AlignedSize - TINY_ALLOC_MAX) / ALIGNMENT) - 1;
+			result = ((ContainedSize - TINY_ALLOC_MAX) / ALIGNMENT) - 1;
 	} else {
-		result = get_large_bin_index(AlignedSize);
+		result = get_large_bin_index(ContainedSize);
 	}
 
 	return result;
@@ -101,6 +101,7 @@ void	put_slot_in_bin(t_header *Hdr, t_memzone *Zone) {
 
 		t_header *PrevHdrIter = NULL;
 
+		// Large bins are sorted from biggest to smallest
 		while (HdrIter != NULL && HdrIter->RealSize > Hdr->RealSize) {
 			PrevHdrIter = HdrIter;
 			HdrIter = HdrIter->NextFree;
@@ -135,57 +136,62 @@ void	remove_slot_from_bin(t_header *Hdr, t_memzone *Zone) {
 	Hdr->NextFree = NULL;
 }
 
+// Check as much free slots as possible before and after the provided one and combine them
 void	try_coalesce_slot(t_header *Hdr, t_header **NextHdrToCheck, t_memzone *Zone) {
 	t_header *NextFree = Hdr->NextFree;
 
 	t_header *Base = Hdr;
-	t_header *Prev = Base->Prev;
 
-	//TODO(felix): optimize this part & start coalescing when backtracking
-	while (Prev != NULL && Prev->State == FREE) {
-		Base = Prev;
-		Prev = Base->Prev;
+	// Get the furthest free slot located contiguously before this one
+	while (Base->Prev != NULL && Base->Prev->State == FREE) {
+		Base = Base->Prev;
 	}
 	
-	size_t NewSize = Base->RealSize;
+	size_t NewSlotSize = Base->RealSize;
 	t_header *Current = Base;
-	t_header *Next = Current->Next;
-	
-	while (Next != NULL && Next->State == FREE) {
 
+	// Go find the furthest free slot located contiguously after the base
+	while (Current->Next != NULL && Current->Next->State == FREE) {
+		
+		// We don't forget to find all the slots in the free list that are part of this large contiguous free segment
+		// to make sure we won't ask them for coalescion, as they will already be coalesced by this pass
 		while (NextFree != NULL 
 			&& (uint64_t)NextFree > (uint64_t)Base
-			&& (uint64_t)NextFree <= (uint64_t)Next)
+			&& (uint64_t)NextFree <= (uint64_t)Current->Next)
 			NextFree = NextFree->NextFree;
 
-		Current = Next;
-		NewSize += Current->RealSize;
+		Current = Current->Next;
+		NewSlotSize += Current->RealSize;
 		remove_slot_from_bin(Current, Zone);
-		Next = Current->Next; 
 	}
 
-	if (Base->RealSize != NewSize) { 
+	// If the registered size has grown, it means we coalesced
+	if (Base->RealSize != NewSlotSize) { 
 		remove_slot_from_bin(Base, Zone);
-		Base->RealSize = NewSize;
+		Base->RealSize = NewSlotSize;
 		Base->Next = Current->Next;
 
-		if (Next != NULL)
-			Next->Prev = Base;
+		if (Current->Next != NULL)
+			Current->Next->Prev = Base;
 	
 		put_slot_in_bin(Base, Zone);
 	}
 
+	// Finally, store the last "nextfree" slot not part of the coalesced segment to be asked for coalescion next
 	*NextHdrToCheck = NextFree;
 }
 
+// Try combine all the contiguous free slots in the zone and update the bins accordingly
 void	coalesce_slots(t_memzone *Zone) {
 	int i = 0;
 
 	while (i < Zone->BinsCount) {
 		t_header *Hdr = Zone->Bins[i];
+		t_header *NextHdrToCheck = NULL;
 
 		while (Hdr != NULL) {
-			try_coalesce_slot(Hdr, &Hdr, Zone);
+			try_coalesce_slot(Hdr, &NextHdrToCheck, Zone);
+			Hdr = NextHdrToCheck;
 		}
 
 		i++;
@@ -200,7 +206,8 @@ void	unmap_memory(t_memchunk *Chunk) {
 	}
 }
 
-void	relink_chunk_and_unmap(t_memchunk *Chunk, t_memzone *Zone) {
+// Remove the chunk from the zone's chunk list and unmap it
+void	remove_chunk_and_unmap(t_memchunk *Chunk, t_memzone *Zone) {
 	t_header *FirstHdr = (t_header *)CHUNK_STARTING_ADDR(Chunk);
 	remove_slot_from_bin(FirstHdr, Zone);
 
@@ -226,32 +233,39 @@ typedef struct	s_unmapchunkargs {
 	size_t 		FreeableChunkSize;
 }				t_unmapchunkargs;
 
+// Try unmap the zone's chunks recursively, going through each of the zone's chunks
+// If it returns 1, it means we reached enough unmappable memory to actually unmap chunks
 int		unmap_chunk_recurse(t_memchunk *Chunk, t_unmapchunkargs *UnmapChunkArgs) {
 	size_t ChunkUsableSize = CHUNK_USABLE_SIZE(Chunk->FullSize);
 	t_header *FirstHdr = (t_header *)CHUNK_STARTING_ADDR(Chunk);
-		
+	
+	// Can the chunk be unmapped ? (Requires the first header to be free and its size equal the size of the chunk)
 	int unmappable = FirstHdr->State == FREE && FirstHdr->RealSize == ChunkUsableSize;
 
 	if (unmappable) {
 		UnmapChunkArgs->FreeableChunkSize += Chunk->FullSize;
 	}
 
+	// If last chunk, check if the total unmappable size accumulated during recursion is enough to be actually unmapped.
+	// This is to prevent the need to remap just after an unmap as much as possible.
 	if (Chunk->Next == NULL) {
 		if (UnmapChunkArgs->FreeableChunkSize < UnmapChunkArgs->MinChunkMemBeforeUnmap)
 			return 0;
-				
+	
 		if (unmappable)
-			relink_chunk_and_unmap(Chunk, UnmapChunkArgs->Zone);
+			remove_chunk_and_unmap(Chunk, UnmapChunkArgs->Zone);
 	
 		return 1;
 	}
 
+	// If we did not reach enough unmappable memory to unmap, return right away
 	if (unmap_chunk_recurse(Chunk->Next, UnmapChunkArgs) == 0) {
 		return 0;
 	}
 
+	// Else, if this one is unmappable, unmap it
 	if (unmappable)
-		relink_chunk_and_unmap(Chunk, UnmapChunkArgs->Zone);
+		remove_chunk_and_unmap(Chunk, UnmapChunkArgs->Zone);
 	
 	return 1;
 }
@@ -262,6 +276,7 @@ typedef struct	s_memparams {
 	size_t	MinChunkMemBeforeUnmap;
 }				t_memparams;
 
+// Unmap some chunks if zone has enough freed memory
 void	unmap_free_zone_chunks(t_memzone *Zone) {
 	t_memparams MemParams;
 
@@ -290,15 +305,16 @@ void	unmap_free_zone_chunks(t_memzone *Zone) {
 	}
 }
 
+// Add a slot into it's zone's bin
 void	free_slot(t_header *Hdr) {
-	size_t RealSize = Hdr->RealSize;
- 	size_t BlockSize = RealSize - HEADER_SIZE;
+	size_t SlotSize = Hdr->RealSize;
+ 	size_t ContainedSize = SlotSize - HEADER_SIZE;
 	
 	t_memzone 	*Zone = NULL;
 
-	if (BlockSize > SMALL_ALLOC_MAX) {
+	if (ContainedSize > SMALL_ALLOC_MAX) {
 		Zone = GET_LARGE_ZONE();
-	} else if (BlockSize > TINY_ALLOC_MAX) {
+	} else if (ContainedSize > TINY_ALLOC_MAX) {
 		Zone = GET_SMALL_ZONE();
 	} else {
 		Zone = GET_TINY_ZONE();
@@ -307,10 +323,11 @@ void	free_slot(t_header *Hdr) {
 	Hdr->State = FREE;
 	put_slot_in_bin(Hdr, Zone);
 
-	Zone->MemStatus.TotalFreedMemSize += RealSize;
-	Zone->MemStatus.FreedMemSinceLastCoalescion += RealSize;
+	Zone->MemStatus.TotalFreedMemSize += SlotSize;
+	Zone->MemStatus.FreedMemSinceLastCoalescion += SlotSize;
 }
 
+// Send all the currently unsorted freed slots into their zone's bin
 void	flush_unsorted_bin() {
 	t_header *Hdr = MemoryLayout.UnsortedBin;
 
@@ -321,12 +338,14 @@ void	flush_unsorted_bin() {
 	}
 
 	MemoryLayout.UnsortedBin = NULL;
-	
+
+	// Check and unmap some fully-free chunks if applicable
 	unmap_free_zone_chunks(GET_LARGE_ZONE());
 	unmap_free_zone_chunks(GET_SMALL_ZONE());
 	unmap_free_zone_chunks(GET_TINY_ZONE());
 }
 
+// Add any freed slot to the temporary unsorted bin first
 void	add_to_unsorted_bin(t_header *Hdr) {
 
 	Hdr->State = UNSORTED_FREE;
