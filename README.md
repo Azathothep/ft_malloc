@@ -22,13 +22,6 @@ For the compiler to know where to look for the library, use `-rpath=[path]` and 
 - malloc(0) returns **NULL**
 - freeing an **already freed pointer** doesn't do anything
 
-**ft_malloc** keeps, at all time, a minimum amount of mapped memory for each zone. This memory will never be unmapped.
-
-This amount depends on the system's page size but for pages of 4096 bytes, it equals:
-- 3 pages for the TINY zone
-- 26 pages for the SMALL zone
-- 20 pages for the LARGE zone
-
 ## Show the memory 
 
 **ft_malloc** also provides access to the `print_mem()` function. It will print out all the memory slots currently mapped, using the following color code:
@@ -93,6 +86,16 @@ Requested page sizes are all aligned to the value returned by `getpagesize()`.
 For TINY and SMALL zones, each request to `mmap` is able to contain at least 100 slots of the maximum allocation size.
 
 For LARGE zones, an `mmap` request is equal to at least 20 pages.
+
+### Minimum mapped memory
+
+**ft_malloc** keeps, at all time, a minimum amount of mapped memory for each zone. This memory will never be unmapped.
+
+This amount depends on the system's page size but for pages of 4096 bytes, it equals:
+- 3 pages for the TINY zone
+- 26 pages for the SMALL zone
+- 20 pages for the LARGE zone
+
 
 ### Memory coalescion
 
