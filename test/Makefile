@@ -53,7 +53,7 @@ makemalloc:
 		${MAKE} -C ${MALLOC_DIR}
 
 makelibft:
-		${MAKE} -C ${LIBFT_DIR}
+		${MAKE} bonus -C ${LIBFT_DIR}
 
 clean:		
 		rm -rf ${OBJ_DIR}
